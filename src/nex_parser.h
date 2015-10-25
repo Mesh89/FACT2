@@ -7,7 +7,7 @@
 
 #include "Tree.h"
 
-void parse_nex(std::istream& in) {
+std::vector<Tree*> parse_nex(std::istream& in) {
 	std::string s;
 	while (getline(in, s)) {
 		if (s.find("BEGIN TREES;") != std::string::npos)
@@ -21,12 +21,13 @@ void parse_nex(std::istream& in) {
 			break;
 	}
 	// Parse trees
+	std::vector<Tree*> trees;
 	while (getline(in, s)) {
 		if (s.find("END;") != std::string::npos)
 			break;
-		Tree* t = new Tree(s);
-		std::cout << t->to_string() << std::endl;
+		trees.push_back(new Tree(s));
 	}
+	return trees;
 }
 
 

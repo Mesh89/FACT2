@@ -3,6 +3,8 @@
 
 #include "nex_parser.h"
 
+#include "freqdiff.h"
+
 using namespace std;
 
 int main(int argc, char** argv) {
@@ -13,7 +15,6 @@ int main(int argc, char** argv) {
 	}
 
 	ifstream fin(argv[1]);
-	parse_nex(fin);
-	cout << "SONO QUI" << endl;
-
+	std::vector<Tree*> trees = parse_nex(fin);
+	freqdiff(trees);
 }
