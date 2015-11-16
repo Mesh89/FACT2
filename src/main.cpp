@@ -16,6 +16,6 @@ int main(int argc, char** argv) {
 
 	ifstream fin(argv[1]);
 	vector<Tree*> trees = parse_nex(fin);
-	std::cout << "TREES PARSED" << std::endl;
-	freqdiff(trees);
+	Tree* fdt = freqdiff(trees);
+	cout << fdt->to_newick() << endl;
 }

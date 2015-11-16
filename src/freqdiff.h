@@ -213,8 +213,6 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t
 		}
 	}
 	t2_tr = build_taxas_ranges(tree2);
-	std::cout << tree1->to_string() << std::endl;
-	std::cout << tree2->to_string() << std::endl;
 
 	int* start,* stop;
 	int* t2_leaves_ranks = new int[Tree::get_taxas_num()];
@@ -285,7 +283,7 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t
 	tree2->fix_tree();
 }
 
-void freqdiff(std::vector<Tree*>& trees) {
+Tree* freqdiff(std::vector<Tree*>& trees) {
 	// weights[i][node id] = weights of cluster of node (with node id) in tree i
 	// initialize all to "number of trees" because trivial clusters will have that value
 	for (size_t i = 0; i < trees.size(); i++) {
@@ -297,7 +295,6 @@ void freqdiff(std::vector<Tree*>& trees) {
 
 	Tree* T = trees[0];
 	for (size_t i = 1; i < trees.size(); i++) {
-		std::cout << "i=" << i << std::endl;
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
 
@@ -305,26 +302,19 @@ void freqdiff(std::vector<Tree*>& trees) {
 		lca_t* lca_Ti = lca_preprocess(trees[i]);
 
 		// filter clusters
-		std::cout << "BEGINNING" << std::endl;
 		bool* to_del_ti = filter_clusters(trees[i], T, tr_Ti, tr_T, lca_T);
 		bool* to_del_t = filter_clusters(T, trees[i], tr_T, tr_Ti, lca_Ti);
-		std::cout << "FILTERED" << std::endl;
 		trees[i]->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
-		std::cout << "DELETED" << std::endl;
-//		std::cout << trees[i]->to_string() << std::endl;
-//		std::cout << T->to_string() << std::endl;
 
 		lca_T = lca_preprocess(T);
 		tr_T = build_taxas_ranges(T);
 		tr_Ti = build_taxas_ranges(trees[i]);
 
 		merge_trees(trees[i], T, tr_Ti, tr_T, lca_T);
-		std::cout << "MERGED" << std::endl;
-		std::cout << T->to_string() << std::endl;
 	}
 
-	std::cout << "END" << std::endl;
+	return T;
 }
 
 

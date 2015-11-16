@@ -28,6 +28,7 @@ public:
 	void fix_tree();
 
 	std::string to_string();
+	std::string to_newick(Node* node = NULL);
 
 private:
 	std::vector<Node*> nodes;

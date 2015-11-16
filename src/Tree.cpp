@@ -5,8 +5,6 @@
 #include <iostream>
 #include <queue>
 
-#include <Windows.h>
-
 #include "Tree.h"
 
 std::unordered_map<std::string,int> Tree::taxa_ids;
@@ -31,6 +29,24 @@ std::string Tree::to_string() {
 	for (Node* node : nodes) {
 		ss << node->to_string() << std::endl;
 	}
+	return ss.str();
+}
+
+std::string Tree::to_newick(Node* node) {
+	if (node == NULL) {
+		node = get_root();
+	}
+
+	if (node->is_leaf()) {
+		return taxa_names[node->get_taxa()];
+	}
+	std::stringstream ss;
+	ss << "(";
+	for (size_t i = 0; i < node->get_children_num(); i++) {
+		if (i > 0) ss << ",";
+		ss << to_newick(node->get_child(i));
+	}
+	ss << ")";
 	return ss.str();
 }
 
@@ -225,8 +241,7 @@ std::string Tree::Node::to_string() {
 		}
 		ss << "]";
 	} else {
-		//ss << taxa_names[taxa]; TODO
-		ss << taxa;
+		ss << taxa_names[taxa];
 	}
 	if (!is_root()) {
 		ss << " (pos in parent: " << get_pos_in_parent() << ")";
