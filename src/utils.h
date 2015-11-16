@@ -17,7 +17,7 @@ int** alloc_int_matrix(int n) {
 	return alloc_int_matrix(n, 0);
 }
 
-std::string vector_to_string(std::vector<int> v) {
+template<class T> std::string vector_to_string(std::vector<T> v) {
 	std::stringstream ss;
 	for (unsigned int i = 0; i < v.size(); i++) {
 		ss << v[i] << " ";
@@ -27,6 +27,9 @@ std::string vector_to_string(std::vector<int> v) {
 
 std::string intarray_to_string(int* a, int n) {
 	return vector_to_string(std::vector<int>(a, a+n));
+}
+std::string boolarray_to_string(bool* a, int n) {
+	return vector_to_string(std::vector<bool>(a, a+n));
 }
 
 inline int int_log2(int n) {

@@ -3,6 +3,9 @@
 #include <cassert>
 #include <sstream>
 #include <iostream>
+#include <queue>
+
+#include <Windows.h>
 
 #include "Tree.h"
 
@@ -51,24 +54,39 @@ Tree::Node* Tree::get_leaf(int taxa) {
 	return taxa_to_leaf[taxa];
 }
 
-Tree::Node* Tree::Node::get_parent() {
-	return parent;
+Tree::Node* Tree::add_node() {
+	Tree::Node* newnode = new Tree::Node(get_nodes_num());
+	nodes.push_back(newnode);
+	return newnode;
 }
 
 void Tree::delete_nodes(bool* to_delete) {
-	for (size_t i = 0; i < get_nodes_num(); i++) {
-		nodes[i]->remove_children(to_delete);
-	}
-
-	int curr_pos = 0;
-	for (size_t i = 0; i < get_nodes_num(); i++) {
+	for (size_t i = 1; i < get_nodes_num(); i++) {
 		if (to_delete[i]) {
+			for (Tree::Node* child : nodes[i]->get_children()) {
+				nodes[i]->get_parent()->add_child(child);
+			}
+			nodes[i]->get_parent()->null_child(nodes[i]->get_pos_in_parent());
 			delete nodes[i];
-		} else {
-			nodes[curr_pos++] = nodes[i];
+			nodes[i] = NULL;
 		}
 	}
-	nodes.resize(curr_pos);
+	fix_tree();
+}
+
+void Tree::fix_tree() {
+	Tree::Node* root = get_root();
+	nodes.clear();
+	fix_tree_supp(root);
+}
+
+void Tree::fix_tree_supp(Tree::Node* curr) {
+	curr->set_id(nodes.size());
+	nodes.push_back(curr);
+	curr->fix_children();
+	for (Tree::Node* child : curr->get_children()) {
+		fix_tree_supp(child);
+	}
 }
 
 Tree::Node* Tree::build_tree(const char*& str) {
@@ -85,7 +103,7 @@ Tree::Node* Tree::build_tree(const char*& str) {
 			subtree = build_tree(str);
 		} else {
 			std::string taxa;
-			while (*str != ':') {
+			while (*str != ':' && *str != ',' && *str != ')') {
 				taxa += *str;
 				str++;
 			}
@@ -117,9 +135,37 @@ int Tree::get_taxa_id(std::string& taxa) {
 	}
 }
 
+void Tree::Node::fix_children() {
+	size_t curr_pos = 0;
+	for (size_t i = 0; i < children.size(); i++) {
+		if (children[i] != NULL) {
+			children[curr_pos] = children[i];
+			children[curr_pos]->pos_in_parent = curr_pos;
+			curr_pos++;
+		}
+	}
+	children.resize(curr_pos);
+}
+
+
+
+Tree::Node* Tree::Node::get_parent() {
+	return parent;
+}
+
+size_t Tree::Node::get_pos_in_parent() {
+	return pos_in_parent;
+}
+
 void Tree::Node::add_child(Node* child) {
 	child->parent = this;
+	child->pos_in_parent = children.size();
 	children.push_back(child);
+}
+void Tree::Node::set_child(Node* child, size_t pos) {
+	child->parent = this;
+	child->pos_in_parent = pos;
+	children[pos] = child;
 }
 
 bool Tree::Node::is_leaf() {
@@ -134,6 +180,10 @@ int Tree::Node::get_id() {
 	return id;
 }
 
+int Tree::Node::set_id(int id) {
+	return this->id = id;
+}
+
 Tree::Node* Tree::Node::get_child(int i) {
 	return children[i];
 }
@@ -142,22 +192,27 @@ std::vector<Tree::Node*> Tree::Node::get_children() {
 	return children;
 }
 
+size_t Tree::Node::get_children_num() {
+	return children.size();
+}
+
 bool Tree::Node::is_root() {
 	return parent == NULL;
 }
 
-void Tree::Node::remove_children(bool* to_delete) {
-	int curr_pos = 0;
-	for (size_t i = 0; i < children.size(); i++) {
-		if (!to_delete[children[i]->get_id()]) {
-			children[curr_pos++] = children[i];
-		}
-	}
-	children.resize(curr_pos);
+void Tree::Node::null_child(size_t pos) {
+	children[pos] = NULL;
 }
 
 void Tree::Node::clear_children() {
 	children.clear();
+}
+
+int Tree::Node::get_weight() {
+	return weight;
+}
+void Tree::Node::set_weight(int weight) {
+	this->weight = weight;
 }
 
 std::string Tree::Node::to_string() {
@@ -170,7 +225,12 @@ std::string Tree::Node::to_string() {
 		}
 		ss << "]";
 	} else {
-		ss << taxa_names[taxa];
+		//ss << taxa_names[taxa]; TODO
+		ss << taxa;
+	}
+	if (!is_root()) {
+		ss << " (pos in parent: " << get_pos_in_parent() << ")";
 	}
 	return ss.str();
 }
+
