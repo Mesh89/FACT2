@@ -23,6 +23,9 @@ print trees
 print ";"
 print ""
 
+print "collapse-;"
+print ""
+
 print "freqdifs*;"
 
 print "tread ''"
