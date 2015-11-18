@@ -145,19 +145,22 @@ bool* filter_clusters(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ran
 		Tree::Node* rightmost_leaf = tree2->get_leaf(t2_tr->taxas[max_rank_in_t2[i]]);
 		int lcaX = lca(t2_lcas, leftmost_leaf->get_id(), rightmost_leaf->get_id());
 		marked[lcaX] = true;
+
 		for (int j = t1_tr->intervals[i].start; j <= t1_tr->intervals[i].end; j++) {
-			marked[tree2->get_leaf(t1_tr->taxas[j])->get_id()] = true;
+			//mark all ancestors
+			Tree::Node* curr = tree2->get_leaf(t1_tr->taxas[j]);
+			while (!marked[curr->get_id()]) {
+				marked[curr->get_id()] = true;
+				curr = curr->get_parent();
+			}
 		}
 
 		for (int j = t2_tr->intervals[lcaX].start; j <= t2_tr->intervals[lcaX].end; j++) {
 			Tree::Node* leaf = tree2->get_leaf(t2_tr->taxas[j]);
-			if (marked[leaf->get_id()]) { // leaf in X, unmark and move on
-				marked[leaf->get_id()] = false;
-			} else { // leaf not in X, mark all ancestors up to lcaX
+			if (!marked[leaf->get_id()]) { // leaf not in X, mark all ancestors up to lcaX
 				Tree::Node* curr = leaf->get_parent();
-				while (!marked[curr->get_id()]) {
-					marked[curr->get_id()] = true;
-					if (node->get_weight() <= tree2->get_node(curr->get_id())->get_weight()) {
+				while (curr->get_id() != lcaX) {
+					if (marked[curr->get_id()] && node->get_weight() <= curr->get_weight()) {
 						// weight of node i in t1 is lower than an incompatible cluster in t2
 						// mark for deletion
 						to_del[i] = true;
@@ -271,6 +274,7 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t
 		if (du_pos == 0 && eu_pos == ru->get_children().size()-1) continue;
 
 		Tree::Node* newnode = tree2->add_node();
+		newnode->set_weight(tree1->get_node(i)->get_weight());
 		for (size_t j = du_pos; j <= eu_pos; j++) {
 			if (ru->get_child(j) != NULL) {
 				newnode->add_child(ru->get_child(j));
@@ -293,25 +297,37 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 	}
 	calc_w_kn2(trees);
 
-	Tree* T = trees[0];
+	Tree* T = trees[0]->copy(); // TODO: wrap nicely in some method
 	for (size_t i = 1; i < trees.size(); i++) {
+		Tree* Ti = trees[i]->copy();
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
-		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
+		taxas_ranges_t* tr_Ti = build_taxas_ranges(Ti);
 
 		lca_t* lca_T = lca_preprocess(T);
-		lca_t* lca_Ti = lca_preprocess(trees[i]);
+		lca_t* lca_Ti = lca_preprocess(Ti);
 
 		// filter clusters
-		bool* to_del_ti = filter_clusters(trees[i], T, tr_Ti, tr_T, lca_T);
-		bool* to_del_t = filter_clusters(T, trees[i], tr_T, tr_Ti, lca_Ti);
-		trees[i]->delete_nodes(to_del_ti);
+		bool* to_del_ti = filter_clusters(Ti, T, tr_Ti, tr_T, lca_T);
+		bool* to_del_t = filter_clusters(T, Ti, tr_T, tr_Ti, lca_Ti);
+		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
 
 		lca_T = lca_preprocess(T);
 		tr_T = build_taxas_ranges(T);
-		tr_Ti = build_taxas_ranges(trees[i]);
+		tr_Ti = build_taxas_ranges(Ti);
 
-		merge_trees(trees[i], T, tr_Ti, tr_T, lca_T);
+		merge_trees(Ti, T, tr_Ti, tr_T, lca_T);
+
+	}
+
+	for (size_t i = 0; i < trees.size(); i++) {
+		taxas_ranges_t* tr_T = build_taxas_ranges(T);
+		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
+
+		lca_t* lca_Ti = lca_preprocess(trees[i]);
+
+		bool* to_del_t = filter_clusters(T, trees[i], tr_T, tr_Ti, lca_Ti);
+		T->delete_nodes(to_del_t);
 	}
 
 	return T;

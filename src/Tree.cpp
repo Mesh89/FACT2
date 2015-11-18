@@ -24,6 +24,15 @@ Tree::Tree(std::string& newick_str) {
 
 Tree::~Tree() {}
 
+Tree* Tree::copy() {
+	std::string t_newick = to_newick();
+	Tree* other = new Tree(t_newick);
+	for (Node* node : nodes) {
+		other->get_node(node->get_id())->set_weight(node->get_weight());
+	}
+	return other;
+}
+
 std::string Tree::to_string() {
 	std::stringstream ss;
 	for (Node* node : nodes) {
@@ -244,7 +253,7 @@ std::string Tree::Node::to_string() {
 		ss << taxa_names[taxa];
 	}
 	if (!is_root()) {
-		ss << " (pos in parent: " << get_pos_in_parent() << ")";
+		ss << " (weight: " << get_weight() << ")";
 	}
 	return ss.str();
 }

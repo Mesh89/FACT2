@@ -15,6 +15,8 @@ public:
 
 	class Node;
 
+	Tree* copy();
+
 	Node* get_node(int i);
 	Node* get_root();
 	size_t get_nodes_num();
