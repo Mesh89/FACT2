@@ -8,14 +8,14 @@ class Tree {
 public:
 	static std::unordered_map<int,std::string> taxa_names;
 
+	Tree();
 	Tree(std::string& newick_str);
+	Tree(Tree* other);
 	virtual ~Tree();
 
 	static size_t get_taxas_num();
 
 	class Node;
-
-	Tree* copy();
 
 	Node* get_node(int i);
 	Node* get_root();
@@ -47,18 +47,18 @@ class Tree::Node {
 public:
 	static const int NONE = -1;
 
-	Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0) {};
-	Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0) {};
+	std::vector<Node*> children;
 
-	int get_taxa();
+	Node(int id);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0) {};
+	Node(int id, int taxa);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0) {};
+
 	int get_id();
-	int set_id(int id);
+	void set_id(int id);
+	int get_taxa();
 
 	Node* get_parent();
 	size_t get_pos_in_parent();
 
-	Node* get_child(int i);
-	std::vector<Node*> get_children();
 	size_t get_children_num();
 
 	void add_child(Node* child);
@@ -76,12 +76,11 @@ public:
 
 	std::string to_string();
 
-
 private:
 	Node* parent;
 	size_t pos_in_parent;
-	int id, taxa, weight;
-	std::vector<Node*> children;
+	int id;
+	int taxa, weight;
 };
 
 #endif

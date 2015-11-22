@@ -1,6 +1,9 @@
 import sys
 import re;
 
+print "mxram 3000;"
+print ""
+
 n, k = int(sys.argv[1]), int(sys.argv[2])
 print "xread", 10, n
 print ""

@@ -16,10 +16,12 @@ struct taxas_ranges_t {
 	struct interval_t {
 		int start, end;
 	}* intervals;
+	int* ranks;
 
-	taxas_ranges_t() : taxas(NULL), intervals(NULL) {}
-	taxas_ranges_t(size_t taxas_num, size_t nodes_num) : taxas(new int[taxas_num]), intervals(new interval_t[nodes_num]) {}
-	~taxas_ranges_t() { delete[] taxas; delete[] intervals; }
+	taxas_ranges_t() : taxas(NULL), intervals(NULL), ranks(NULL) {}
+	taxas_ranges_t(size_t taxas_num, size_t nodes_num) : taxas(new int[taxas_num]), intervals(new interval_t[nodes_num]),
+			ranks(new int[taxas_num]) {}
+	~taxas_ranges_t() { delete[] taxas; delete[] intervals; delete[] ranks; }
 };
 
 void build_taxas_ranges_supp(Tree::Node* node, taxas_ranges_t* tr) {
@@ -29,16 +31,19 @@ void build_taxas_ranges_supp(Tree::Node* node, taxas_ranges_t* tr) {
 		tr->i++;
 		return;
 	}
-	for (Tree::Node* child : node->get_children()) {
+	for (Tree::Node* child : node->children) {
 		build_taxas_ranges_supp(child, tr);
 	}
-	tr->intervals[node->get_id()].start = tr->intervals[node->get_child(0)->get_id()].start;
-	tr->intervals[node->get_id()].end = tr->intervals[node->get_child(node->get_children().size()-1)->get_id()].end;
+	tr->intervals[node->get_id()].start = tr->intervals[node->children[0]->get_id()].start;
+	tr->intervals[node->get_id()].end = tr->intervals[node->children[node->get_children_num()-1]->get_id()].end;
 }
 
 taxas_ranges_t* build_taxas_ranges(Tree* tree) {
 	taxas_ranges_t* tr = new taxas_ranges_t(Tree::get_taxas_num(), tree->get_nodes_num());
 	build_taxas_ranges_supp(tree->get_root(), tr);
+	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
+		tr->ranks[tr->taxas[i]] = i;
+	}
 	return tr;
 }
 

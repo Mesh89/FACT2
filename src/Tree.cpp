@@ -10,6 +10,8 @@
 std::unordered_map<std::string,int> Tree::taxa_ids;
 std::unordered_map<int,std::string> Tree::taxa_names;
 
+Tree::Tree() {}
+
 Tree::Tree(std::string& newick_str) {
 	const char* str = newick_str.c_str();
 	while (*str != '(') str++;
@@ -22,16 +24,23 @@ Tree::Tree(std::string& newick_str) {
 	}
 }
 
-Tree::~Tree() {}
+Tree::Tree(Tree* other) {
+	nodes.reserve(other->get_nodes_num());
+	taxa_to_leaf.resize(Tree::get_taxas_num());
+	for (Node* node : other->nodes) {
+		Tree::Node* newnode = new Node(node->get_id(), node->get_taxa());
+		newnode->set_weight(node->get_weight());
+		nodes.push_back(newnode);
 
-Tree* Tree::copy() {
-	std::string t_newick = to_newick();
-	Tree* other = new Tree(t_newick);
-	for (Node* node : nodes) {
-		other->get_node(node->get_id())->set_weight(node->get_weight());
+		if (!node->is_root()) {
+			nodes[node->get_parent()->get_id()]->add_child(newnode);
+		}
+		if (newnode->is_leaf())
+			taxa_to_leaf[newnode->get_taxa()] = newnode;
 	}
-	return other;
 }
+
+Tree::~Tree() {}
 
 std::string Tree::to_string() {
 	std::stringstream ss;
@@ -53,7 +62,7 @@ std::string Tree::to_newick(Node* node) {
 	ss << "(";
 	for (size_t i = 0; i < node->get_children_num(); i++) {
 		if (i > 0) ss << ",";
-		ss << to_newick(node->get_child(i));
+		ss << to_newick(node->children[i]);
 	}
 	ss << ")";
 	return ss.str();
@@ -88,7 +97,7 @@ Tree::Node* Tree::add_node() {
 void Tree::delete_nodes(bool* to_delete) {
 	for (size_t i = 1; i < get_nodes_num(); i++) {
 		if (to_delete[i]) {
-			for (Tree::Node* child : nodes[i]->get_children()) {
+			for (Tree::Node* child : nodes[i]->children) {
 				nodes[i]->get_parent()->add_child(child);
 			}
 			nodes[i]->get_parent()->null_child(nodes[i]->get_pos_in_parent());
@@ -109,7 +118,7 @@ void Tree::fix_tree_supp(Tree::Node* curr) {
 	curr->set_id(nodes.size());
 	nodes.push_back(curr);
 	curr->fix_children();
-	for (Tree::Node* child : curr->get_children()) {
+	for (Tree::Node* child : curr->children) {
 		fix_tree_supp(child);
 	}
 }
@@ -160,6 +169,9 @@ int Tree::get_taxa_id(std::string& taxa) {
 	}
 }
 
+Tree::Node::Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0) {}
+Tree::Node::Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0) {}
+
 void Tree::Node::fix_children() {
 	size_t curr_pos = 0;
 	for (size_t i = 0; i < children.size(); i++) {
@@ -171,7 +183,6 @@ void Tree::Node::fix_children() {
 	}
 	children.resize(curr_pos);
 }
-
 
 
 Tree::Node* Tree::Node::get_parent() {
@@ -197,24 +208,15 @@ bool Tree::Node::is_leaf() {
 	return taxa != NONE;
 }
 
-int Tree::Node::get_taxa() {
-	return taxa;
-}
-
 int Tree::Node::get_id() {
 	return id;
 }
-
-int Tree::Node::set_id(int id) {
-	return this->id = id;
+void Tree::Node::set_id(int id) {
+	this->id = id;
 }
 
-Tree::Node* Tree::Node::get_child(int i) {
-	return children[i];
-}
-
-std::vector<Tree::Node*> Tree::Node::get_children() {
-	return children;
+int Tree::Node::get_taxa() {
+	return taxa;
 }
 
 size_t Tree::Node::get_children_num() {

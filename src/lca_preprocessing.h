@@ -19,22 +19,15 @@ struct rmq_t {
 struct lca_t {
 	std::vector<int> E, R;
 	rmq_t* rmq_prep;
+
+	lca_t() : rmq_prep(new rmq_t) {}
 };
 
 
-rmq_t* rmq_preprocess(std::vector<int>& v) {
-	rmq_t* rmq_prep = new rmq_t;
-
-	int range = v.size();
-	int block_size = 0;
-	while (range >>= 1) ++block_size;
-
-	while (v.size() % block_size != 0) {
-		v.push_back(v[v.size()-1]+1);
-	}
-
-	int blocks = v.size() / block_size;
-	blocks += (v.size() % block_size != 0);
+void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
+	size_t size = v.size();
+	int block_size = int_log2(size);
+	int blocks = size / block_size + (size % block_size != 0);
 
 	std::vector<int> Ap(blocks, INT32_MAX);
 	std::vector<int> B(blocks, 0);
@@ -62,7 +55,7 @@ rmq_t* rmq_preprocess(std::vector<int>& v) {
 		}
 	}
 
-	rmq_prep->prep_blocks.resize(v.size(), NULL);
+	rmq_prep->prep_blocks.resize(size, NULL);
 	for (int i = 0; i < blocks; i++) {
 		int address = 0;
 		for (int j = 1; j < block_size; j++) {
@@ -97,9 +90,8 @@ rmq_t* rmq_preprocess(std::vector<int>& v) {
 		}
 	}
 
-	rmq_prep->v = v;
+	//rmq_prep->v = v;
 	rmq_prep->block_size = block_size;
-	return rmq_prep;
 }
 
 int rmq2(rmq_t* rmq_prep, int a, int b) {
@@ -162,22 +154,29 @@ void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int>& L, s
 	E.push_back(node->get_id());
 	L.push_back(depth);
 	if (R[node->get_id()] == -1) R[node->get_id()] = E.size()-1;
-	for (Tree::Node* child : node->get_children()) {
+	for (Tree::Node* child : node->children) {
 		eulerian_walk(child, E, L, R, depth+1);
 		E.push_back(node->get_id());
 		L.push_back(depth);
 	}
 }
 
+void resize_to_logmul(std::vector<int>& v) {
+	int log_size = int_log2(v.size());
+	if (v.size() % log_size != 0)
+		v.resize((v.size()/log_size + 1)*log_size, v[v.size()-1]+1);
+}
+
 lca_t* lca_preprocess(Tree* t) {
 	lca_t* lca_prep = new lca_t;
 
-	std::vector<int> L;
 	lca_prep->R.resize(t->get_nodes_num(), -1);
-	eulerian_walk(t->get_root(), lca_prep->E, L, lca_prep->R, 0);
-	rmq_preprocess(lca_prep->E);
+	eulerian_walk(t->get_root(), lca_prep->E, lca_prep->rmq_prep->v, lca_prep->R, 0);
 
-	lca_prep->rmq_prep = rmq_preprocess(L);
+	resize_to_logmul(lca_prep->E);
+	resize_to_logmul(lca_prep->rmq_prep->v);
+
+	rmq_preprocess(lca_prep->rmq_prep, lca_prep->rmq_prep->v);
 	return lca_prep;
 }
 
