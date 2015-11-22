@@ -20,7 +20,7 @@ Tree::Tree(std::string& newick_str) {
 	taxa_to_leaf.resize(Tree::get_taxas_num());
 	for (Node* node : nodes) {
 		if (node->is_leaf())
-			taxa_to_leaf[node->get_taxa()] = node;
+			taxa_to_leaf[node->taxa] = node;
 	}
 }
 
@@ -28,15 +28,15 @@ Tree::Tree(Tree* other) {
 	nodes.reserve(other->get_nodes_num());
 	taxa_to_leaf.resize(Tree::get_taxas_num());
 	for (Node* node : other->nodes) {
-		Tree::Node* newnode = new Node(node->get_id(), node->get_taxa());
-		newnode->set_weight(node->get_weight());
+		Tree::Node* newnode = new Node(node->id, node->taxa);
+		newnode->weight = node->weight;
 		nodes.push_back(newnode);
 
 		if (!node->is_root()) {
-			nodes[node->get_parent()->get_id()]->add_child(newnode);
+			nodes[node->parent->id]->add_child(newnode);
 		}
 		if (newnode->is_leaf())
-			taxa_to_leaf[newnode->get_taxa()] = newnode;
+			taxa_to_leaf[newnode->taxa] = newnode;
 	}
 }
 
@@ -56,7 +56,7 @@ std::string Tree::to_newick(Node* node) {
 	}
 
 	if (node->is_leaf()) {
-		return taxa_names[node->get_taxa()];
+		return taxa_names[node->taxa];
 	}
 	std::stringstream ss;
 	ss << "(";
@@ -98,9 +98,9 @@ void Tree::delete_nodes(bool* to_delete) {
 	for (size_t i = 1; i < get_nodes_num(); i++) {
 		if (to_delete[i]) {
 			for (Tree::Node* child : nodes[i]->children) {
-				nodes[i]->get_parent()->add_child(child);
+				nodes[i]->parent->add_child(child);
 			}
-			nodes[i]->get_parent()->null_child(nodes[i]->get_pos_in_parent());
+			nodes[i]->parent->null_child(nodes[i]->pos_in_parent);
 			delete nodes[i];
 			nodes[i] = NULL;
 		}
@@ -115,12 +115,15 @@ void Tree::fix_tree() {
 }
 
 void Tree::fix_tree_supp(Tree::Node* curr) {
-	curr->set_id(nodes.size());
+	curr->id = nodes.size();
 	nodes.push_back(curr);
 	curr->fix_children();
 	for (Tree::Node* child : curr->children) {
 		fix_tree_supp(child);
 	}
+}
+
+void Tree::reorder() {
 }
 
 Tree::Node* Tree::build_tree(const char*& str) {
@@ -185,14 +188,6 @@ void Tree::Node::fix_children() {
 }
 
 
-Tree::Node* Tree::Node::get_parent() {
-	return parent;
-}
-
-size_t Tree::Node::get_pos_in_parent() {
-	return pos_in_parent;
-}
-
 void Tree::Node::add_child(Node* child) {
 	child->parent = this;
 	child->pos_in_parent = children.size();
@@ -206,17 +201,6 @@ void Tree::Node::set_child(Node* child, size_t pos) {
 
 bool Tree::Node::is_leaf() {
 	return taxa != NONE;
-}
-
-int Tree::Node::get_id() {
-	return id;
-}
-void Tree::Node::set_id(int id) {
-	this->id = id;
-}
-
-int Tree::Node::get_taxa() {
-	return taxa;
 }
 
 size_t Tree::Node::get_children_num() {
@@ -235,13 +219,6 @@ void Tree::Node::clear_children() {
 	children.clear();
 }
 
-int Tree::Node::get_weight() {
-	return weight;
-}
-void Tree::Node::set_weight(int weight) {
-	this->weight = weight;
-}
-
 std::string Tree::Node::to_string() {
 	std::stringstream ss;
 	ss << id << " ";
@@ -255,7 +232,7 @@ std::string Tree::Node::to_string() {
 		ss << taxa_names[taxa];
 	}
 	if (!is_root()) {
-		ss << " (weight: " << get_weight() << ")";
+		ss << " (weight: " << weight << ")";
 	}
 	return ss.str();
 }

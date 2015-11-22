@@ -32,6 +32,8 @@ public:
 	std::string to_string();
 	std::string to_newick(Node* node = NULL);
 
+	void reorder(); // puts for each node, puts heaviest subtree as first child
+
 private:
 	std::vector<Node*> nodes;
 	std::vector<Node*> taxa_to_leaf;
@@ -49,38 +51,27 @@ public:
 
 	std::vector<Node*> children;
 
+	Node* parent;
+	size_t pos_in_parent;
+	int id;
+	int taxa, weight;
+	size_t size; // number of leaves in subtree
+
 	Node(int id);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0) {};
 	Node(int id, int taxa);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0) {};
-
-	int get_id();
-	void set_id(int id);
-	int get_taxa();
-
-	Node* get_parent();
-	size_t get_pos_in_parent();
 
 	size_t get_children_num();
 
 	void add_child(Node* child);
 	void set_child(Node* child, size_t pos);
 	void null_child(size_t pos);
-	void remove_children(bool* to_delete);
 	void clear_children();
 	void fix_children(); // remove null children and recompacts others
 
 	bool is_leaf();
 	bool is_root();
 
-	int get_weight();
-	void set_weight(int weight);
-
 	std::string to_string();
-
-private:
-	Node* parent;
-	size_t pos_in_parent;
-	int id;
-	int taxa, weight;
 };
 
 #endif

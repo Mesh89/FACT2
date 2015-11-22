@@ -26,16 +26,16 @@ struct taxas_ranges_t {
 
 void build_taxas_ranges_supp(Tree::Node* node, taxas_ranges_t* tr) {
 	if (node->is_leaf()) {
-		tr->taxas[tr->i] = node->get_taxa();
-		tr->intervals[node->get_id()].start = tr->intervals[node->get_id()].end = tr->i;
+		tr->taxas[tr->i] = node->taxa;
+		tr->intervals[node->id].start = tr->intervals[node->id].end = tr->i;
 		tr->i++;
 		return;
 	}
 	for (Tree::Node* child : node->children) {
 		build_taxas_ranges_supp(child, tr);
 	}
-	tr->intervals[node->get_id()].start = tr->intervals[node->children[0]->get_id()].start;
-	tr->intervals[node->get_id()].end = tr->intervals[node->children[node->get_children_num()-1]->get_id()].end;
+	tr->intervals[node->id].start = tr->intervals[node->children[0]->id].start;
+	tr->intervals[node->id].end = tr->intervals[node->children[node->get_children_num()-1]->id].end;
 }
 
 taxas_ranges_t* build_taxas_ranges(Tree* tree) {

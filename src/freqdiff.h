@@ -56,10 +56,10 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 				// fill bit vector for current node
 				bool* bitvector = new bool[n];
 				std::fill(bitvector, bitvector+n, 0);
-				for (int j = tr->intervals[node->get_id()].start; j <= tr->intervals[node->get_id()].end; j++) {
+				for (int j = tr->intervals[node->id].start; j <= tr->intervals[node->id].end; j++) {
 					bitvector[tr->taxas[j]] = 1;
 				}
-				node_bitvec_t node_bitvec(t, node->get_id(), bitvector);
+				node_bitvec_t node_bitvec(t, node->id, bitvector);
 				bitvectors.push_back(node_bitvec);
 			}
 		}
@@ -99,7 +99,7 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 		int w = 1;
 		while (i+w < bitvc && equal(bit0[i].bitvec,bit0[i+w].bitvec,n)) w++;
 		for (int j = i; j < i+w; j++) {
-			trees[bit0[j].tree_id]->get_node(bit0[j].node_id)->set_weight(w);
+			trees[bit0[j].tree_id]->get_node(bit0[j].node_id)->weight = w;
 		}
 		i += w;
 	}
@@ -117,15 +117,15 @@ void compute_start_stop(Tree* tree1, Tree* tree2, int* t2_leaves_ranks) {
 	for (int i = tree1->get_nodes_num()-1; i >= 0; i--) {
 		Tree::Node* node = tree1->get_node(i);
 		if (node->is_leaf()) {
-			start[i] = stop[i] = t2_leaves_ranks[node->get_taxa()];
+			start[i] = stop[i] = t2_leaves_ranks[node->taxa];
 		} else {
 			start[i] = INT32_MAX;
 			stop[i] = 0;
 			for (Tree::Node* child : node->children) {
-				if (start[i] > start[child->get_id()])
-					start[i] = start[child->get_id()];
-				if (stop[i] < stop[child->get_id()])
-					stop[i] = stop[child->get_id()];
+				if (start[i] > start[child->id])
+					start[i] = start[child->id];
+				if (stop[i] < stop[child->id])
+					stop[i] = stop[child->id];
 			}
 		}
 	}
@@ -147,30 +147,30 @@ void filter_clusters(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_rang
 		std::fill(marked, marked+tree2->get_nodes_num(), false);
 		Tree::Node* leftmost_leaf = tree2->get_leaf(t2_tr->taxas[start[i]]);
 		Tree::Node* rightmost_leaf = tree2->get_leaf(t2_tr->taxas[stop[i]]);
-		int lcaX = lca(t2_lcas, leftmost_leaf->get_id(), rightmost_leaf->get_id());
+		int lcaX = lca(t2_lcas, leftmost_leaf->id, rightmost_leaf->id);
 		marked[lcaX] = true;
 
 		for (int j = t1_tr->intervals[i].start; j <= t1_tr->intervals[i].end; j++) {
 			//mark all ancestors
 			Tree::Node* curr = tree2->get_leaf(t1_tr->taxas[j]);
-			while (!marked[curr->get_id()]) {
-				marked[curr->get_id()] = true;
-				curr = curr->get_parent();
+			while (!marked[curr->id]) {
+				marked[curr->id] = true;
+				curr = curr->parent;
 			}
 		}
 
 		for (int j = t2_tr->intervals[lcaX].start; j <= t2_tr->intervals[lcaX].end; j++) {
 			Tree::Node* leaf = tree2->get_leaf(t2_tr->taxas[j]);
-			if (!marked[leaf->get_id()]) { // leaf not in X, mark all ancestors up to lcaX
-				Tree::Node* curr = leaf->get_parent();
-				while (curr->get_id() != lcaX) {
-					if (marked[curr->get_id()] && node->get_weight() <= curr->get_weight()) {
+			if (!marked[leaf->id]) { // leaf not in X, mark all ancestors up to lcaX
+				Tree::Node* curr = leaf->parent;
+				while (curr->id != lcaX) {
+					if (marked[curr->id] && node->weight <= curr->weight) {
 						// weight of node i in t1 is lower than an incompatible cluster in t2
 						// mark for deletion
 						to_del[i] = true;
 						break;
 					}
-					curr = curr->get_parent();
+					curr = curr->parent;
 
 				}
 			}
@@ -182,16 +182,16 @@ void filter_clusters(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_rang
 
 void compute_m(Tree::Node* node, int* e, int* m, std::vector<Tree::Node*>* rsort_lists) {
 	if (node->is_leaf()) {
-		m[node->get_id()] = e[node->get_taxa()];
+		m[node->id] = e[node->taxa];
 	}
 	for (Tree::Node* child : node->children) {
 		compute_m(child, e, m, rsort_lists);
-		if (m[node->get_id()] > m[child->get_id()]) {
-			m[node->get_id()] = m[child->get_id()];
+		if (m[node->id] > m[child->id]) {
+			m[node->id] = m[child->id];
 		}
 	}
 	if (!node->is_root()) {
-		rsort_lists[m[node->get_id()]].push_back(node);
+		rsort_lists[m[node->id]].push_back(node);
 	}
 }
 
@@ -213,7 +213,7 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 	}
 	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
 		for (auto it = rsort_lists[i].begin(); it != rsort_lists[i].end(); it++) {
-			(*it)->get_parent()->add_child(*it);
+			(*it)->parent->add_child(*it);
 		}
 	}
 
@@ -223,30 +223,30 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 	// calc depth
 	depths[0] = 0; // root depth
 	for (size_t i = 1; i < tree2->get_nodes_num(); i++) {
-		depths[i] = 1 + depths[tree2->get_node(i)->get_parent()->get_id()];
+		depths[i] = 1 + depths[tree2->get_node(i)->parent->id];
 	}
 
 	// calc x_left and x_right
 	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
 		Tree::Node* curr = tree2->get_leaf(i);
-		Tree::Node* parent = curr->get_parent();
+		Tree::Node* parent = curr->parent;
 		while (parent != NULL && *(parent->children.begin()) == curr) {
 			curr = parent;
-			parent = curr->get_parent();
+			parent = curr->parent;
 		}
 		left[i] = curr;
 
 		curr = tree2->get_leaf(i);
-		parent = curr->get_parent();
+		parent = curr->parent;
 		while (parent != NULL && *(parent->children.rbegin()) == curr) {
 			curr = parent;
-			parent = curr->get_parent();
+			parent = curr->parent;
 		}
 		right[i] = curr;
 	}
 
 	for (size_t i = 0; i < tree2->get_nodes_num(); i++) {
-		orig_pos_in_parent[i] = tree2->get_node(i)->get_pos_in_parent();
+		orig_pos_in_parent[i] = tree2->get_node(i)->pos_in_parent;
 	}
 
 	for (int i = tree1->get_nodes_num()-1; i >= 1; i--) {
@@ -254,19 +254,19 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 		Tree::Node* b = tree2->get_leaf(t2_tr->taxas[stop[i]]);
 		if (a == b) continue; // tree1->node i is a leaf
 
-		Tree::Node* ru = tree2->get_node(lca(t2_lcas, a->get_id(), b->get_id()));
+		Tree::Node* ru = tree2->get_node(lca(t2_lcas, a->id, b->id));
 
-		Tree::Node* a_left = left[a->get_taxa()];
-		Tree::Node* b_right = right[b->get_taxa()];
+		Tree::Node* a_left = left[a->taxa];
+		Tree::Node* b_right = right[b->taxa];
 
-		size_t du_pos = (depths[a_left->get_id()] > depths[ru->get_id()]) ?
-				orig_pos_in_parent[a_left->get_id()] : 0;
-		size_t eu_pos = (depths[b_right->get_id()] > depths[ru->get_id()]) ?
-				orig_pos_in_parent[b_right->get_id()] : ru->get_children_num()-1;
+		size_t du_pos = (depths[a_left->id] > depths[ru->id]) ?
+				orig_pos_in_parent[a_left->id] : 0;
+		size_t eu_pos = (depths[b_right->id] > depths[ru->id]) ?
+				orig_pos_in_parent[b_right->id] : ru->get_children_num()-1;
 		if (du_pos == 0 && eu_pos == ru->get_children_num()-1) continue;
 
 		Tree::Node* newnode = tree2->add_node();
-		newnode->set_weight(tree1->get_node(i)->get_weight());
+		newnode->weight = tree1->get_node(i)->weight;
 		for (size_t j = du_pos; j <= eu_pos; j++) {
 			if (ru->children[j] != NULL) {
 				newnode->add_child(ru->children[j]);
@@ -300,7 +300,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 	// initialize all to "number of trees" because trivial clusters will have that value
 	for (size_t i = 0; i < trees.size(); i++) {
 		for (size_t j = 0; j < trees[i]->get_nodes_num(); j++) {
-			trees[i]->get_node(j)->set_weight(trees.size());
+			trees[i]->get_node(j)->weight = trees.size();
 		}
 	}
 	calc_w_kn2(trees);

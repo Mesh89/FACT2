@@ -151,12 +151,12 @@ int lca(lca_t* lca_prep, int u, int v) {
 }
 
 void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int>& L, std::vector<int>& R, int depth) {
-	E.push_back(node->get_id());
+	E.push_back(node->id);
 	L.push_back(depth);
-	if (R[node->get_id()] == -1) R[node->get_id()] = E.size()-1;
+	if (R[node->id] == -1) R[node->id] = E.size()-1;
 	for (Tree::Node* child : node->children) {
 		eulerian_walk(child, E, L, R, depth+1);
-		E.push_back(node->get_id());
+		E.push_back(node->id);
 		L.push_back(depth);
 	}
 }
