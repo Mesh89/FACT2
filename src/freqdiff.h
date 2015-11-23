@@ -182,7 +182,7 @@ void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_r
 }
 
 
-void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t* t2_tr, lca_t* t2_lcas,
+void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas,
 		bool* to_del) {
 
 	size_t* counter = new size_t[Tree::get_taxas_num()*2];
@@ -191,7 +191,7 @@ void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, tax
 	std::fill(BT, BT+Tree::get_taxas_num()*2, false);
 	std::priority_queue<std::pair<int, int> > BTw;
 
-	Tree::Node* curr = tree1->get_root();
+	Tree::Node* curr = t1_root;
 	while (!curr->is_leaf()) {
 		curr = curr->children[0];
 	}
@@ -199,11 +199,15 @@ void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, tax
 	curr = curr->parent;
 	// curr is now p_2 (see [XXX])
 
-	compute_start_stop(tree1, tree2, t2_tr->ranks);
-	while (curr != NULL) {
-		Tree::Node* ri = tree2->get_node(
-				lca(t2_lcas, tree2->get_leaf(t2_tr->taxas[start[curr->id]])->id, tree2->get_leaf(t2_tr->taxas[stop[curr->id]])->id)
-				);
+
+	while (curr != t1_root->parent) {
+		int curr_t1_start = t1_tr->intervals[curr->id].start;
+		int curr_t1_end = t1_tr->intervals[curr->id].end;
+
+		Tree::Node* ri = tree2->get_leaf(curr_t1_start);
+		for (int i = curr_t1_start+1; i <= curr_t1_end; i++) {
+			ri = tree2->get_node(lca(t2_lcas, ri->id, tree2->get_leaf(t1_tr->taxas[i])->id));
+		}
 
 		while (rim1 != ri) {
 			BT[rim1->id] = true;
@@ -211,27 +215,23 @@ void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, tax
 			rim1 = rim1->parent;
 		}
 
-		int Dstart = start[curr->id] + curr->children[0]->size,
-			Dend = stop[curr->id];
-		for (int i = Dstart; i <= Dend; i++) {
-			Tree::Node* x = tree2->get_leaf(t2_tr->taxas[i]);
+		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
+			Tree::Node* x = tree2->get_leaf(t1_tr->taxas[i]);
 			while (!BT[x->id] && x != ri) {
 				BT[x->id] = true;
 				BTw.push(std::make_pair(x->weight, x->id));
 				x = x->parent;
 			}
 		}
-
-		for (int i = Dstart; i <= Dend; i++) {
-			Tree::Node* x = tree2->get_leaf(t2_tr->taxas[i]);
+		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
+			Tree::Node* x = tree2->get_leaf(t1_tr->taxas[i]);
 			counter[x->id]++;
-			while (x != NULL && counter[x->id] == x->size) {
+			while (x != ri && counter[x->id] == x->size) { // TODO: check
 				counter[x->parent->id] += x->size;
 				BT[x->id] = false;
 				x = x->parent;
 			}
 		}
-
 		std::pair<int, int> top;
 		while (!BTw.empty()) {
 			top = BTw.top();
@@ -242,8 +242,8 @@ void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, tax
 
 		// TODO: beta_i stuff
 
-		if (curr->weight > M) {
-			// TODO: insert
+		if (curr->weight <= M) {
+			to_del[curr->id] = true;
 		}
 
 		curr = curr->parent;
@@ -392,9 +392,9 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 
 		// filter clusters
 		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
-		filter_clusters_nlog2n(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
 		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
-		filter_clusters_nlog2n(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
+		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
 		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
 
