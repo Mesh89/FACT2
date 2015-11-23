@@ -9,6 +9,7 @@
 #define FREQDIFF_H_
 
 #include <iostream>
+#include <queue>
 #include <cassert>
 
 #include "taxas_ranges.h"
@@ -132,7 +133,7 @@ void compute_start_stop(Tree* tree1, Tree* tree2, int* t2_leaves_ranks) {
 }
 
 
-void filter_clusters(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t* t2_tr, lca_t* t2_lcas,
+void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t* t2_tr, lca_t* t2_lcas,
 		bool* to_del) {
 
 	compute_start_stop(tree1, tree2, t2_tr->ranks);
@@ -179,6 +180,76 @@ void filter_clusters(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_rang
 		}
 	}
 }
+
+
+void filter_clusters_nlog2n(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t* t2_tr, lca_t* t2_lcas,
+		bool* to_del) {
+
+	size_t* counter = new size_t[Tree::get_taxas_num()*2];
+	std::fill(counter, counter+Tree::get_taxas_num()*2, 0);
+	bool* BT = new bool[Tree::get_taxas_num()*2];
+	std::fill(BT, BT+Tree::get_taxas_num()*2, false);
+	std::priority_queue<std::pair<int, int> > BTw;
+
+	Tree::Node* curr = tree1->get_root();
+	while (!curr->is_leaf()) {
+		curr = curr->children[0];
+	}
+	Tree::Node* rim1 = tree2->get_leaf(curr->taxa);
+	curr = curr->parent;
+	// curr is now p_2 (see [XXX])
+
+	compute_start_stop(tree1, tree2, t2_tr->ranks);
+	while (curr != NULL) {
+		Tree::Node* ri = tree2->get_node(
+				lca(t2_lcas, tree2->get_leaf(t2_tr->taxas[start[curr->id]])->id, tree2->get_leaf(t2_tr->taxas[stop[curr->id]])->id)
+				);
+
+		while (rim1 != ri) {
+			BT[rim1->id] = true;
+			BTw.push(std::make_pair(rim1->weight, rim1->id));
+			rim1 = rim1->parent;
+		}
+
+		int Dstart = start[curr->id] + curr->children[0]->size,
+			Dend = stop[curr->id];
+		for (int i = Dstart; i <= Dend; i++) {
+			Tree::Node* x = tree2->get_leaf(t2_tr->taxas[i]);
+			while (!BT[x->id] && x != ri) {
+				BT[x->id] = true;
+				BTw.push(std::make_pair(x->weight, x->id));
+				x = x->parent;
+			}
+		}
+
+		for (int i = Dstart; i <= Dend; i++) {
+			Tree::Node* x = tree2->get_leaf(t2_tr->taxas[i]);
+			counter[x->id]++;
+			while (x != NULL && counter[x->id] == x->size) {
+				counter[x->parent->id] += x->size;
+				BT[x->id] = false;
+				x = x->parent;
+			}
+		}
+
+		std::pair<int, int> top;
+		while (!BTw.empty()) {
+			top = BTw.top();
+			BTw.pop();
+			if (BT[top.second]) break;
+		}
+		int M = BTw.empty() ? 0 : top.first;
+
+		// TODO: beta_i stuff
+
+		if (curr->weight > M) {
+			// TODO: insert
+		}
+
+		curr = curr->parent;
+	}
+}
+
 
 void compute_m(Tree::Node* node, int* e, int* m, std::vector<Tree::Node*>* rsort_lists) {
 	if (node->is_leaf()) {
@@ -267,6 +338,7 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 
 		Tree::Node* newnode = tree2->add_node();
 		newnode->weight = tree1->get_node(i)->weight;
+		newnode->size = tree1->get_node(i)->size;
 		for (size_t j = du_pos; j <= eu_pos; j++) {
 			if (ru->children[j] != NULL) {
 				newnode->add_child(ru->children[j]);
@@ -319,8 +391,10 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		lca_t* lca_T = lca_preprocess(T);
 
 		// filter clusters
-		filter_clusters(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
-		filter_clusters(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
+		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		filter_clusters_nlog2n(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
+		filter_clusters_nlog2n(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
 		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
 
@@ -336,7 +410,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
 
-		filter_clusters(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
+		filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
 		T->delete_nodes(to_del_t);
 	}
 
