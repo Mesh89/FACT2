@@ -139,7 +139,6 @@ void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_r
 	compute_start_stop(tree1, tree2, t2_tr->ranks);
 
 	// mark clusters in t1 to be deleted if a heavier incompatible cluster is in t2
-	std::fill(to_del, to_del+tree1->get_nodes_num(), false);
 	for (size_t i = 1; i < tree1->get_nodes_num(); i++) {
 		Tree::Node* node = tree1->get_node(i);
 		if (node->is_leaf())
@@ -199,13 +198,12 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	curr = curr->parent;
 	// curr is now p_2 (see [XXX])
 
-
+	int curr_t1_start = 0;
 	while (curr != t1_root->parent) {
-		int curr_t1_start = t1_tr->intervals[curr->id].start;
 		int curr_t1_end = t1_tr->intervals[curr->id].end;
 
-		Tree::Node* ri = tree2->get_leaf(curr_t1_start);
-		for (int i = curr_t1_start+1; i <= curr_t1_end; i++) {
+		Tree::Node* ri = rim1;
+		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
 			ri = tree2->get_node(lca(t2_lcas, ri->id, tree2->get_leaf(t1_tr->taxas[i])->id));
 		}
 
@@ -241,12 +239,12 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			if (BT[top.second]) break;
 		}
 		int M = BTw.empty() ? 0 : top.first;
-
 		if (curr->weight <= std::max(M, beta)) {
 			to_del[curr->id] = true;
 		}
 
 		curr = curr->parent;
+		curr_t1_start = curr_t1_end + 1;
 	}
 }
 
@@ -385,16 +383,20 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 	Tree* T = new Tree(trees[0]); //trees[0]->copy();
 	for (size_t i = 1; i < trees.size(); i++) {
 		Tree* Ti = new Tree(trees[i]); //trees[i]->copy();
-		taxas_ranges_t* tr_T = build_taxas_ranges(T);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(Ti);
+
+		T->reorder();
+		taxas_ranges_t* tr_T = build_taxas_ranges(T);
 
 		lca_t* lca_T = lca_preprocess(T);
 
 		// filter clusters
+		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
 		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
-		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
-		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
+
+		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
+
 		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
 
@@ -410,8 +412,9 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
 
+		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
-		T->delete_nodes(to_del_t);
+		T->delete_nodes(to_del_t); // TODO: could be moved outside?
 	}
 
 	delete[] start;
