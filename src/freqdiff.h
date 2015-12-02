@@ -215,11 +215,13 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			rim1 = rim1->parent;
 		}
 
+		int beta = 0;
 		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
 			Tree::Node* x = tree2->get_leaf(t1_tr->taxas[i]);
 			while (!BT[x->id] && x != ri) {
 				BT[x->id] = true;
 				BTw.push(std::make_pair(x->weight, x->id));
+				if (x->weight > beta && false) beta = x->weight; // TODO: and is special node
 				x = x->parent;
 			}
 		}
@@ -240,9 +242,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 		}
 		int M = BTw.empty() ? 0 : top.first;
 
-		// TODO: beta_i stuff
-
-		if (curr->weight <= M) {
+		if (curr->weight <= std::max(M, beta)) {
 			to_del[curr->id] = true;
 		}
 
