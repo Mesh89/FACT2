@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iostream>
 #include <queue>
+#include <stack>
 
 #include "Tree.h"
 
@@ -117,8 +118,9 @@ void Tree::delete_nodes(bool* to_delete) {
 	fix_tree();
 }
 
-void Tree::fix_tree() {
-	Tree::Node* root = get_root();
+void Tree::fix_tree(Tree::Node* root) {
+	if (root == NULL)
+		root = get_root();
 	nodes.clear();
 	fix_tree_supp(root);
 }
@@ -194,8 +196,8 @@ int Tree::get_taxa_id(std::string& taxa) {
 	}
 }
 
-Tree::Node::Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0), size(0) {}
-Tree::Node::Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0), size(0) {}
+Tree::Node::Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(NONE), weight(0), size(0) {}
+Tree::Node::Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(taxa), weight(0), size(0) {}
 
 void Tree::Node::fix_children() {
 	size_t curr_pos = 0;
@@ -253,9 +255,10 @@ std::string Tree::Node::to_string() {
 	} else {
 		ss << taxa_names[taxa];
 	}
-	if (!is_root()) {
-		ss << " (weight: " << weight << ")";
-	}
+//	if (!is_root()) {
+	ss << ", weight: " << weight << ", sec id: " << secondary_id;
+//	}
 	return ss.str();
 }
+
 

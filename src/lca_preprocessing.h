@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "Tree.h"
 #include "utils.h"
 
 
@@ -24,7 +25,7 @@ struct lca_t {
 };
 
 
-void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
+inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 	size_t size = v.size();
 	int block_size = int_log2(size);
 	int blocks = size / block_size + (size % block_size != 0);
@@ -94,7 +95,7 @@ void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 	rmq_prep->block_size = block_size;
 }
 
-int rmq2(rmq_t* rmq_prep, int a, int b) {
+inline int rmq2(rmq_t* rmq_prep, int a, int b) {
 
 	int ba = (a/rmq_prep->block_size) + (a % rmq_prep->block_size != 0);
 	int bb = (b/rmq_prep->block_size) - (b % rmq_prep->block_size != rmq_prep->block_size-1);
@@ -114,7 +115,7 @@ int rmq2(rmq_t* rmq_prep, int a, int b) {
 	}
 }
 
-int rmq(rmq_t* rmq_prep, int a, int b) {
+inline int rmq(rmq_t* rmq_prep, int a, int b) {
 	if (a/rmq_prep->block_size == b/rmq_prep->block_size) { //same block
 		int block_idx = a/rmq_prep->block_size;
 		return block_idx*rmq_prep->block_size + rmq_prep->prep_blocks[rmq_prep->addresses[a/rmq_prep->block_size]]
@@ -142,7 +143,7 @@ int rmq(rmq_t* rmq_prep, int a, int b) {
 }
 
 
-int lca(lca_t* lca_prep, int u, int v) {
+inline int lca(lca_t* lca_prep, int u, int v) {
 	if (lca_prep->R[u] < lca_prep->R[v]) {
 		return lca_prep->E[rmq(lca_prep->rmq_prep, lca_prep->R[u], lca_prep->R[v])];
 	} else {
@@ -150,7 +151,7 @@ int lca(lca_t* lca_prep, int u, int v) {
 	}
 }
 
-void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int>& L, std::vector<int>& R, int depth) {
+inline void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int>& L, std::vector<int>& R, int depth) {
 	E.push_back(node->id);
 	L.push_back(depth);
 	if (R[node->id] == -1) R[node->id] = E.size()-1;
@@ -161,13 +162,13 @@ void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int>& L, s
 	}
 }
 
-void resize_to_logmul(std::vector<int>& v) {
+inline void resize_to_logmul(std::vector<int>& v) {
 	int log_size = int_log2(v.size());
 	if (v.size() % log_size != 0)
 		v.resize((v.size()/log_size + 1)*log_size, v[v.size()-1]+1);
 }
 
-lca_t* lca_preprocess(Tree* t) {
+inline lca_t* lca_preprocess(Tree* t) {
 	lca_t* lca_prep = new lca_t;
 
 	lca_prep->R.resize(t->get_nodes_num(), -1);

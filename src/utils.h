@@ -2,8 +2,9 @@
 #define UTILS_H_
 
 #include <sstream>
+#include <stack>
 
-int** alloc_int_matrix(int n, int v) {
+inline int** alloc_int_matrix(int n, int v) {
 	int* a = new int[n*n];
 	std::fill(a, a+n*n, v);
 
@@ -13,7 +14,7 @@ int** alloc_int_matrix(int n, int v) {
 	}
 	return m;
 }
-int** alloc_int_matrix(int n) {
+inline int** alloc_int_matrix(int n) {
 	return alloc_int_matrix(n, 0);
 }
 
@@ -25,10 +26,10 @@ template<class T> std::string vector_to_string(std::vector<T> v) {
 	return ss.str();
 }
 
-std::string intarray_to_string(int* a, int n) {
+inline std::string intarray_to_string(int* a, int n) {
 	return vector_to_string(std::vector<int>(a, a+n));
 }
-std::string boolarray_to_string(bool* a, int n) {
+inline std::string boolarray_to_string(bool* a, int n) {
 	return vector_to_string(std::vector<bool>(a, a+n));
 }
 
@@ -37,6 +38,5 @@ inline int int_log2(int n) {
 	while (n >>= 1) ++targetlevel;
 	return targetlevel;
 }
-
 
 #endif /* UTILS_H_ */

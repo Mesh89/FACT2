@@ -27,7 +27,7 @@ public:
 	void delete_nodes(bool* to_delete);
 
 	// Applies lazy children deletions and resorts the nodes in topological order
-	void fix_tree();
+	void fix_tree(Node* root = NULL);
 
 	std::string to_string();
 	std::string to_newick(Node* node = NULL);
@@ -53,7 +53,7 @@ public:
 
 	Node* parent;
 	size_t pos_in_parent;
-	int id;
+	int id, secondary_id;
 	int taxa, weight;
 	size_t size; // number of leaves in subtree
 
