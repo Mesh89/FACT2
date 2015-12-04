@@ -184,6 +184,8 @@ void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_r
 
 // leaves in marked must be sorted in left-to-right order
 Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think about externalizing depths and lca_t
+	if (marked.empty()) return NULL;
+
 	int* depths = new int[tree->get_nodes_num()];
 	depths[0] = 0; // root depth
 	for (size_t i = 1; i < tree->get_nodes_num(); i++) {
@@ -353,6 +355,16 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 		p_index++;
 	}
 	std::vector<int>* leaves_sets = new std::vector<int>[p_index];
+	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
+		if (leaf_p_index[t2_tr->taxas[i]] >= 0) {
+			leaves_sets[leaf_p_index[t2_tr->taxas[i]]].push_back(t2_tr->taxas[i]);
+		}
+	}
+
+	// build restrictions and recurse
+	for (int i = 0; i < p_index; i++) {
+		contract_tree_fast(orig_t2, leaves_sets[i]);
+	}
 
 	/* Handle centroid path */
 	curr_t1_start = 0;
