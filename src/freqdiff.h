@@ -316,7 +316,7 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 }
 
 
-Tree* orig_t2 = NULL;
+Tree* orig_t2 = NULL; // TODO: temporary
 void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas,
 		bool* to_del) {
 	size_t* counter = new size_t[Tree::get_taxas_num()*2];
@@ -329,7 +329,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	std::fill(leaf_p_index, leaf_p_index+Tree::get_taxas_num(), -1);
 
 	std::priority_queue<std::pair<int, int> > BTw;
-	taxas_ranges_t* t2_tr = build_taxas_ranges(tree2);
+	taxas_ranges_t* t2_tr = build_taxas_ranges(orig_t2);
 
 	Tree::Node* curr = t1_root;
 	while (!curr->is_leaf()) {
@@ -567,6 +567,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		orig_t2 = T; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
+		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
 
 		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
