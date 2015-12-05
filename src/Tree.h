@@ -23,7 +23,7 @@ public:
 
 	Node* get_leaf(int taxa);
 
-	Tree::Node* add_node();
+	Tree::Node* add_node(int taxa = -1);
 	void delete_nodes(bool* to_delete);
 
 	// Applies lazy children deletions and resorts the nodes in topological order
@@ -36,7 +36,8 @@ public:
 
 private:
 	std::vector<Node*> nodes;
-	std::vector<Node*> taxa_to_leaf;
+	std::vector<Node*> taxa_to_leaf; // TODO: how much the map reduces performance?
+	std::unordered_map<int, Node*> taxa_to_leaf_map;
 
 	static std::unordered_map<std::string,int> taxa_ids;
 	static int get_taxa_id(std::string& taxa);
@@ -72,6 +73,7 @@ public:
 	bool is_root();
 
 	std::string to_string();
+	std::string to_newick();
 };
 
 #endif

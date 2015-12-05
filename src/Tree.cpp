@@ -22,6 +22,7 @@ Tree::Tree(std::string& newick_str) {
 	for (Node* node : nodes) {
 		if (node->is_leaf())
 			taxa_to_leaf[node->taxa] = node;
+			taxa_to_leaf_map[node->taxa] = node;
 	}
 
 	for (int i = nodes.size()-1; i > 0 ; i--) {
@@ -46,6 +47,7 @@ Tree::Tree(Tree* other) {
 		}
 		if (newnode->is_leaf()) {
 			taxa_to_leaf[newnode->taxa] = newnode;
+			taxa_to_leaf_map[newnode->taxa] = newnode;
 		}
 	}
 }
@@ -64,18 +66,7 @@ std::string Tree::to_newick(Node* node) {
 	if (node == NULL) {
 		node = get_root();
 	}
-
-	if (node->is_leaf()) {
-		return taxa_names[node->taxa];
-	}
-	std::stringstream ss;
-	ss << "(";
-	for (size_t i = 0; i < node->get_children_num(); i++) {
-		if (i > 0) ss << ",";
-		ss << to_newick(node->children[i]);
-	}
-	ss << ")";
-	return ss.str();
+	return node->to_newick();
 }
 
 size_t Tree::get_taxas_num() {
@@ -95,12 +86,16 @@ Tree::Node* Tree::get_root() {
 }
 
 Tree::Node* Tree::get_leaf(int taxa) {
-	return taxa_to_leaf[taxa];
+	//return taxa_to_leaf[taxa];
+	return taxa_to_leaf_map[taxa];
 }
 
-Tree::Node* Tree::add_node() {
+Tree::Node* Tree::add_node(int taxa) {
 	Tree::Node* newnode = new Tree::Node(get_nodes_num());
 	nodes.push_back(newnode);
+	if (taxa >= 0) {
+		taxa_to_leaf_map[taxa] = newnode;
+	}
 	return newnode;
 }
 
@@ -261,4 +256,16 @@ std::string Tree::Node::to_string() {
 	return ss.str();
 }
 
-
+std::string Tree::Node::to_newick() {
+	if (is_leaf()) {
+		return taxa_names[taxa];
+	}
+	std::stringstream ss;
+	ss << "(";
+	for (size_t i = 0; i < get_children_num(); i++) {
+		if (i > 0) ss << ",";
+		ss << children[i]->to_newick();
+	}
+	ss << ")";
+	return ss.str();
+}

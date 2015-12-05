@@ -266,13 +266,14 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		// create node
 		if (i%2 == 0 || exists[i]) {
 			if (tree_nodes[i] == NULL) {
-				tree_nodes[i] = new_tree->add_node();
+				if (i%2 == 0) { //a leaf
+					tree_nodes[i] = new_tree->add_node(marked[i/2]);
+				} else {
+					tree_nodes[i] = new_tree->add_node();
+				}
 			}
 			tree_nodes[i]->weight = tree->get_node(ids[i])->weight;
 			tree_nodes[i]->secondary_id = ids[i];
-			if (i%2 == 0) { //a leaf
-				tree_nodes[i]->taxa = marked[i/2];
-			}
 		}
 
 		// connect to parent
@@ -319,6 +320,7 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 Tree* orig_t2 = NULL; // TODO: temporary
 void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas,
 		bool* to_del) {
+
 	size_t* counter = new size_t[Tree::get_taxas_num()*2];
 	std::fill(counter, counter+Tree::get_taxas_num()*2, 0);
 
@@ -340,19 +342,21 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	Tree::Node* p_2 = curr;
 
 	/* Handle side trees */
-	int curr_t1_start = 1, p_index = 0;
+	int p_index = 0;
 
 	// build sorted sets of leaves
+	std::vector<Tree::Node*> st_roots;
 	while (curr != t1_root->parent) {
-		int curr_t1_end = t1_tr->intervals[curr->id].end;
+		for (size_t i = 1; i < curr->get_children_num(); i++) {
+			Tree::Node* child = curr->children[i];
+			for (int j = t1_tr->intervals[child->id].start; j <= t1_tr->intervals[child->id].end; j++) {
+				leaf_p_index[t1_tr->taxas[j]] = p_index;
+			}
+			st_roots.push_back(child);
 
-		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
-			leaf_p_index[t1_tr->taxas[i]] = p_index;
+			p_index++;
 		}
-
 		curr = curr->parent;
-		curr_t1_start = curr_t1_end + 1;
-		p_index++;
 	}
 	std::vector<int>* leaves_sets = new std::vector<int>[p_index];
 	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
@@ -363,11 +367,15 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 
 	// build restrictions and recurse
 	for (int i = 0; i < p_index; i++) {
-		contract_tree_fast(orig_t2, leaves_sets[i]);
+		if (leaves_sets[i].size() > 1) {
+			Tree* contracted = contract_tree_fast(orig_t2, leaves_sets[i]);
+			lca_t* lca_ct2 = lca_preprocess(contracted);
+			filter_clusters_nlog2n(st_roots[i], contracted, t1_tr, lca_ct2, to_del);
+		}
 	}
 
 	/* Handle centroid path */
-	curr_t1_start = 0;
+	int curr_t1_start = t1_tr->intervals[t1_root->id].start;
 	curr = p_2;
 	while (curr != t1_root->parent) {
 		int curr_t1_end = t1_tr->intervals[curr->id].end;
