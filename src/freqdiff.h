@@ -289,7 +289,8 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 	assert(tree_nodes[root_pos]->parent == NULL);
 
 	// insert special nodes TODO: RMQ
-	for (size_t i = 0; i < new_tree->get_nodes_num(); i++) {
+	size_t newtree_nodes = new_tree->get_nodes_num();
+	for (size_t i = 0; i < newtree_nodes; i++) {
 		Tree::Node* curr_node = new_tree->get_node(i);
 		Tree::Node* orig_node = tree->get_node(curr_node->secondary_id);
 
@@ -337,7 +338,16 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	while (!curr->is_leaf()) {
 		curr = curr->children[0];
 	}
+
+	// T_2[p_1] should is "initialized" separately
 	Tree::Node* rim1 = tree2->get_leaf(curr->taxa);
+	counter[rim1->id]++;
+	while (counter[rim1->id] == rim1->size) { // TODO: check
+		counter[rim1->parent->id] += rim1->size;
+		BT[rim1->id] = false;
+		rim1 = rim1->parent;
+	}
+
 	curr = curr->parent;
 	Tree::Node* p_2 = curr;
 
@@ -375,7 +385,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	}
 
 	/* Handle centroid path */
-	int curr_t1_start = t1_tr->intervals[t1_root->id].start;
+	int curr_t1_start = t1_tr->intervals[t1_root->id].start + 1;
 	curr = p_2;
 	while (curr != t1_root->parent) {
 		int curr_t1_end = t1_tr->intervals[curr->id].end;
@@ -385,6 +395,10 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			ri = tree2->get_node(lca(t2_lcas, ri->id, tree2->get_leaf(t1_tr->taxas[i])->id));
 		}
 
+		if (counter[rim1->id] == rim1->size) {
+			rim1 = rim1->parent;
+		}
+		assert(counter[rim1->id] != rim1->size);
 		while (rim1 != ri) {
 			BT[rim1->id] = true;
 			BTw.push(std::make_pair(rim1->weight, rim1->id));
@@ -572,7 +586,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
 		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
 
-		orig_t2 = T; // TODO: temporary
+		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
 		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
