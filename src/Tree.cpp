@@ -91,7 +91,7 @@ Tree::Node* Tree::get_leaf(int taxa) {
 }
 
 Tree::Node* Tree::add_node(int taxa) {
-	Tree::Node* newnode = new Tree::Node(get_nodes_num());
+	Tree::Node* newnode = new Tree::Node(get_nodes_num(), taxa);
 	nodes.push_back(newnode);
 	if (taxa >= 0) {
 		taxa_to_leaf_map[taxa] = newnode;
@@ -118,6 +118,14 @@ void Tree::fix_tree(Tree::Node* root) {
 		root = get_root();
 	nodes.clear();
 	fix_tree_supp(root);
+
+	// recalc sizes
+	for (int i = nodes.size()-1; i > 0 ; i--) {
+		if (nodes[i]->is_leaf()) {
+			nodes[i]->size = 1;
+		}
+		nodes[i]->parent->size += nodes[i]->size;
+	}
 }
 
 void Tree::fix_tree_supp(Tree::Node* curr) {
