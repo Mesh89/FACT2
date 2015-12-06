@@ -395,10 +395,10 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			ri = tree2->get_node(lca(t2_lcas, ri->id, tree2->get_leaf(t1_tr->taxas[i])->id));
 		}
 
-		if (counter[rim1->id] == rim1->size) {
+		if (counter[rim1->id] == rim1->size && ri != rim1) {
+			counter[rim1->parent->id] += rim1->size;
 			rim1 = rim1->parent;
 		}
-		assert(counter[rim1->id] != rim1->size);
 		while (rim1 != ri) {
 			BT[rim1->id] = true;
 			BTw.push(std::make_pair(rim1->weight, rim1->id));
@@ -424,6 +424,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 				x = x->parent;
 			}
 		}
+
 		std::pair<int, int> top;
 		while (!BTw.empty()) {
 			top = BTw.top();
@@ -589,6 +590,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
+		//std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
 		filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
 
 		Ti->delete_nodes(to_del_ti);
