@@ -120,6 +120,9 @@ void Tree::fix_tree(Tree::Node* root) {
 	fix_tree_supp(root);
 
 	// recalc sizes
+	for (size_t i = 0; i < nodes.size(); i++) {
+		nodes[i]->size = 0;
+	}
 	for (int i = nodes.size()-1; i > 0 ; i--) {
 		if (nodes[i]->is_leaf()) {
 			nodes[i]->size = 1;
