@@ -205,7 +205,9 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		ids.push_back(tree->get_leaf(marked[i])->secondary_id);
 	}
 
-	std::vector<int> vleft(levels.size(), -1), right_pot_child(levels.size(), -1);
+	std::vector<int> vleft(levels.size(), -1), pointer(levels.size(), -1);
+	for (size_t i = 0; i < levels.size(); i++) pointer[i] = i;
+
 	std::stack<int> Sl;
 	for (size_t i = 0; i < levels.size(); i++) {
 		while (!Sl.empty() && levels[i] <= levels[Sl.top()]) {
@@ -214,7 +216,6 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 
 		if (!Sl.empty()) {
 			vleft[i] = Sl.top();
-			right_pot_child[Sl.top()] = i;
 		}
 		Sl.push(i);
 	}
@@ -236,20 +237,20 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 	std::vector<int> parent(levels.size(), -1);
 	std::vector<bool> exists(levels.size(), false);
 	for (size_t i = 0; i < levels.size(); i++) {
-		if (vleft[i] == -1 && vright[i] == -1) { //root
+		if (root_pos == -1 && vleft[i] == -1 && vright[i] == -1) { //root
 			root_pos = i;
 		} else if (vleft[i] == -1) {
-			parent[i] = vright[i];
+			parent[i] = pointer[vright[i]];
 		} else if (vright[i] == -1) {
-			parent[i] = vleft[i];
+			parent[i] = pointer[vleft[i]];
 		} else {
 			if (levels[vleft[i]] >= levels[vright[i]]) {
-				parent[i] = vleft[i];
+				parent[i] = pointer[vleft[i]];
 				if (levels[vleft[i]] == levels[vright[i]]) { // deals with non-binary nodes
-					vleft[right_pot_child[vright[i]]] = vleft[i];
+					pointer[vright[i]] = pointer[vleft[i]];
 				}
 			} else {
-				parent[i] = vright[i];
+				parent[i] = pointer[vright[i]];
 			}
 		}
 
@@ -376,7 +377,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	// build restrictions and recurse
 	for (int i = 0; i < p_index; i++) {
 		if (leaves_sets[i].size() > 1) {
-			Tree* contracted = contract_tree_fast(orig_t2, leaves_sets[i]); // TODO: reorder
+			Tree* contracted = contract_tree_fast(orig_t2, leaves_sets[i]);
 			lca_t* lca_ct2 = lca_preprocess(contracted);
 			filter_clusters_nlog2n(st_roots[i], contracted, t1_tr, lca_ct2, to_del);
 		}
@@ -565,6 +566,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		for (size_t j = 0; j < trees[i]->get_nodes_num(); j++) {
 			trees[i]->get_node(j)->weight = trees.size();
 		}
+		trees[i]->reorder();
 	}
 	calc_w_kn2(trees);
 
@@ -584,8 +586,10 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		lca_t* lca_T = lca_preprocess(T);
 
 		// filter clusters
+		orig_t2 = T; // TODO: temporary
 		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
-		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
+//		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
 
 		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
@@ -598,6 +602,11 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		tr_Ti = build_taxas_ranges(Ti);
 
 		merge_trees(Ti, T, tr_Ti, lca_T);
+
+		// reset secondary ids
+		for (size_t j = 0; j < T->get_nodes_num(); j++) {
+			T->get_node(j)->secondary_id = T->get_node(j)->id;
+		}
 
 		// delete Ti;
 	}
