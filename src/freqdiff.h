@@ -393,7 +393,6 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	curr = p_2;
 	while (curr != t1_root->parent) {
 		int curr_t1_end = t1_tr->intervals[curr->id].end;
-		std::cout << curr->id << std::endl;
 
 		Tree::Node* ri = rim1;
 		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
@@ -583,7 +582,6 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 
 	Tree* T = new Tree(trees[0]);
 	for (size_t i = 1; i < trees.size(); i++) {
-		std::cout << "T vs T_" << i << std::endl;
 		Tree* Ti = new Tree(trees[i]);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(Ti);
 
@@ -596,17 +594,6 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		orig_t2 = T; // TODO: temporary
 		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
 		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
-		std::string s1 = boolarray_to_string(to_del_ti, Ti->get_nodes_num());
-		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
-		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
-		std::string s2 = boolarray_to_string(to_del_ti, Ti->get_nodes_num());
-		if (s1 != s2) {
-			std::cout << "WE HAVE A PROBLEM." << std::endl;
-			std::cout << s1 << std::endl;
-			std::cout << s2 << std::endl;
-			std::cout << Ti->to_string() << std::endl;
-			std::cout << T->to_string() << std::endl;
-		}
 
 		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
