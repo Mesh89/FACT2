@@ -296,11 +296,12 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		Tree::Node* orig_node = tree->get_node(curr_node->secondary_id);
 
 		if (curr_node->is_root() || orig_node->is_root()) continue;
-		int w = 0, par_sid = curr_node->parent->secondary_id;
+		int w = 0, par_sid = curr_node->parent->secondary_id, sec_id;
 		orig_node = orig_node->parent;
 		while (orig_node->id != par_sid) {
 			if (w < orig_node->weight) {
 				w = orig_node->weight;
+				sec_id = orig_node->id;
 			}
 			orig_node = orig_node->parent;
 		}
@@ -308,6 +309,7 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		if (w > 0) {
 			Tree::Node* sp_node = new_tree->add_node();
 			sp_node->weight = w;
+			sp_node->secondary_id = sec_id;
 			curr_node->parent->null_child(curr_node->pos_in_parent);
 			curr_node->parent->add_child(sp_node);
 			sp_node->add_child(curr_node);
@@ -320,6 +322,9 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 
 
 Tree* orig_t2 = NULL; // TODO: temporary
+bool is_special(Tree::Node* node) {
+	return node->size < orig_t2->get_node(node->secondary_id)->size;
+}
 void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas,
 		bool* to_del) {
 
@@ -388,6 +393,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	curr = p_2;
 	while (curr != t1_root->parent) {
 		int curr_t1_end = t1_tr->intervals[curr->id].end;
+		std::cout << curr->id << std::endl;
 
 		Tree::Node* ri = rim1;
 		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
@@ -397,13 +403,13 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 		if (counter[rim1->id] == rim1->size && ri != rim1 && rim1->get_children_num() != 1) {
 			// if children of rim1 are all "marked", should not go into BT
 			counter[rim1->parent->id] += rim1->size;
-			if (rim1->weight > beta && rim1->get_children_num() == 1) beta = rim1->weight;
+			if (rim1->weight > beta && is_special(rim1)) beta = rim1->weight;
 			rim1 = rim1->parent;
 		}
 		while (rim1 != ri) {
 			BT[rim1->id] = true;
 			BTw.push(std::make_pair(rim1->weight, rim1->id));
-			if (rim1->weight > beta && rim1->get_children_num() == 1) beta = rim1->weight;
+			if (rim1->weight > beta && is_special(rim1)) beta = rim1->weight;
 			rim1 = rim1->parent;
 		}
 
@@ -412,14 +418,14 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			while (!BT[x->id] && x != ri) {
 				BT[x->id] = true;
 				BTw.push(std::make_pair(x->weight, x->id));
-				if (x->weight > beta && x->get_children_num() == 1) beta = x->weight; // TODO: and is special node
+				if (x->weight > beta && is_special(x)) beta = x->weight; // TODO: and is special node
 				x = x->parent;
 			}
 		}
 		for (int i = curr_t1_start; i <= curr_t1_end; i++) {
 			Tree::Node* x = tree2->get_leaf(t1_tr->taxas[i]);
 			counter[x->id]++;
-			while (x != ri && counter[x->id] == x->size && x->get_children_num() != 1) { // TODO: check
+			while (x != ri && counter[x->id] == x->size && !is_special(x)) { // TODO: check
 				counter[x->parent->id] += x->size;
 				BT[x->id] = false;
 				x = x->parent;
@@ -577,6 +583,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 
 	Tree* T = new Tree(trees[0]);
 	for (size_t i = 1; i < trees.size(); i++) {
+		std::cout << "T vs T_" << i << std::endl;
 		Tree* Ti = new Tree(trees[i]);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(Ti);
 
@@ -589,7 +596,17 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		orig_t2 = T; // TODO: temporary
 		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
 		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
-//		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		std::string s1 = boolarray_to_string(to_del_ti, Ti->get_nodes_num());
+		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
+		filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		std::string s2 = boolarray_to_string(to_del_ti, Ti->get_nodes_num());
+		if (s1 != s2) {
+			std::cout << "WE HAVE A PROBLEM." << std::endl;
+			std::cout << s1 << std::endl;
+			std::cout << s2 << std::endl;
+			std::cout << Ti->to_string() << std::endl;
+			std::cout << T->to_string() << std::endl;
+		}
 
 		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
