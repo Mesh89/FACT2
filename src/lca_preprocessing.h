@@ -24,6 +24,11 @@ struct lca_t {
 	lca_t() : rmq_prep(new rmq_t) {}
 };
 
+struct gen_rmq_t {
+	lca_t* lca_prep;
+	std::vector<int> v, pos_to_id, id_to_pos;
+};
+
 
 inline void resize_to_logmul(std::vector<int>& v) {
 	int log_size = int_log2(v.size());
@@ -183,6 +188,53 @@ inline lca_t* lca_preprocess(Tree* t) {
 
 	rmq_preprocess(lca_prep->rmq_prep, lca_prep->rmq_prep->v);
 	return lca_prep;
+}
+
+
+inline int general_rmq(gen_rmq_t* gen_rmq_prep, int a, int b) {
+	return gen_rmq_prep->id_to_pos[lca(gen_rmq_prep->lca_prep, gen_rmq_prep->pos_to_id[a], gen_rmq_prep->pos_to_id[b])];
+}
+
+
+inline void general_rmq_preprocess(gen_rmq_t* gen_rmq_prep) {
+	Tree* cartesian = new Tree;
+	std::vector<Tree::Node*> orig_pos;
+	Tree::Node* start = cartesian->add_node();
+	Tree::Node* root = start;
+	start->weight = gen_rmq_prep->v[0];
+	orig_pos.push_back(start);
+	for (size_t i = 1; i < gen_rmq_prep->v.size(); i++) {
+		if (gen_rmq_prep->v[i] >= start->weight) {
+			Tree::Node* node = cartesian->add_node();
+			start->add_child(node);
+			start = node;
+		} else {
+			while (start != NULL && start->weight > gen_rmq_prep->v[i]) {
+				start = start->parent;
+			}
+			if (start == NULL) {
+				start = cartesian->add_node();
+				start->add_child(root);
+				root = start;
+			} else {
+				Tree::Node* node = cartesian->add_node();
+				node->add_child(start->children[start->children.size()-1]);
+				start->set_child(node, start->children.size()-1);
+				start = node;
+			}
+		}
+		start->weight = gen_rmq_prep->v[i];
+		orig_pos.push_back(start);
+	}
+	cartesian->fix_tree(root);
+
+	gen_rmq_prep->id_to_pos.resize(orig_pos.size());
+	for (Tree::Node* node : orig_pos) {
+		gen_rmq_prep->id_to_pos[node->id] = gen_rmq_prep->pos_to_id.size();
+		gen_rmq_prep->pos_to_id.push_back(node->id);
+	}
+
+	gen_rmq_prep->lca_prep = lca_preprocess(cartesian);
 }
 
 
