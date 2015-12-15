@@ -35,9 +35,9 @@ inline bool equal(bool* bitv1, bool* bitv2, size_t size) {
 
 struct subpath_query_info_t {
 	Tree::Node** cp_roots;
-	rmq_t** cp_rmqs;
+	gen_rmq_t** cp_rmqs;
 
-	subpath_query_info_t(Tree::Node** cp_roots, rmq_t** cp_rmqs) : cp_roots(cp_roots), cp_rmqs(cp_rmqs) {}
+	subpath_query_info_t(Tree::Node** cp_roots, gen_rmq_t** cp_rmqs) : cp_roots(cp_roots), cp_rmqs(cp_rmqs) {}
 };
 
 int* start,* stop;
@@ -203,14 +203,14 @@ subpath_query_info_t* preprocess_subpaths_queries(Tree* tree) {
 		}
 	}
 
-	rmq_t** cp_rmqs = new rmq_t*[tree->get_nodes_num()];
+	gen_rmq_t** cp_rmqs = new gen_rmq_t*[tree->get_nodes_num()];
 	for (size_t i = 0; i < tree->get_nodes_num(); i++) {
-		cp_rmqs[i] = new rmq_t;
+		cp_rmqs[i] = new gen_rmq_t;
 		cp_rmqs[cp_roots[i]->id]->v.push_back(-tree->get_node(i)->weight);
 	}
 	for (size_t i = 0; i < tree->get_nodes_num(); i++) {
 		if (cp_rmqs[i]->v.size() > 1) {
-			rmq_preprocess(cp_rmqs[i], cp_rmqs[i]->v); // TODO: the rmq API needs some revisiting
+			general_rmq_preprocess(cp_rmqs[i]); // TODO: the rmq API needs some revisiting
 		}
 	}
 
@@ -225,9 +225,9 @@ subpath_query_info_t* preprocess_subpaths_queries(Tree* tree) {
 		Tree::Node* curr = tree->get_leaf(i)->parent;
 		leaf_rmqs[i] = new rmq_t;
 		while (curr != NULL) {
-			rmq_t* currpath_rmq = cp_rmqs[cp_roots[curr->id]->id];
+			gen_rmq_t* currpath_rmq = cp_rmqs[cp_roots[curr->id]->id];
 			int query_endp = depths[curr->id] - depths[cp_roots[curr->id]->id];
-			leaf_rmqs[i]->v.push_back(currpath_rmq->v[rmq(currpath_rmq, 0, query_endp)]);
+			leaf_rmqs[i]->v.push_back(currpath_rmq->v[general_rmq(currpath_rmq, 0, query_endp)]);
 			curr = cp_roots[curr->id]->parent;
 		}
 		if (leaf_rmqs[i]->v.size() > 1) { // FIXME: if size(v) is 1, rmq_preprocess crashes.
@@ -242,20 +242,20 @@ int max_subpath_query(subpath_query_info_t* subpq_info, Tree::Node* ancestor, Tr
 	Tree::Node* curr = descendant;
 	int res = 0;
 	while (subpq_info->cp_roots[curr->secondary_id] != subpq_info->cp_roots[ancestor->secondary_id]) {
-		rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
+		gen_rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
 		int query_endp = depths[curr->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
 		if (query_endp == 0) {
 			res = std::min(res, currpath_rmq->v[0]);
 		} else {
-			res = std::min(res, currpath_rmq->v[rmq(currpath_rmq, 0, query_endp)]);
+			res = std::min(res, currpath_rmq->v[general_rmq(currpath_rmq, 0, query_endp)]);
 		}
 		curr = subpq_info->cp_roots[curr->secondary_id]->parent;
 	}
-	rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
+	gen_rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
 	int query_startp = depths[ancestor->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
 	int query_endp = depths[curr->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
 	if (query_startp < query_endp) {
-		res = std::min(res, currpath_rmq->v[rmq(currpath_rmq, query_startp+1, query_endp)]);
+		res = std::min(res, currpath_rmq->v[general_rmq(currpath_rmq, query_startp+1, query_endp)]);
 	}
 	return -res;
 }
