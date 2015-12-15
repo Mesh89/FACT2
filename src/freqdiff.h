@@ -33,6 +33,13 @@ inline bool equal(bool* bitv1, bool* bitv2, size_t size) {
 	return true;
 }
 
+struct subpath_query_info_t {
+	Tree::Node** cp_roots;
+	rmq_t** cp_rmqs;
+
+	subpath_query_info_t(Tree::Node** cp_roots, rmq_t** cp_rmqs) : cp_roots(cp_roots), cp_rmqs(cp_rmqs) {}
+};
+
 int* start,* stop;
 int* e,* m;
 std::vector<Tree::Node*>* rsort_lists;
@@ -182,6 +189,78 @@ void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_r
 	}
 }
 
+
+subpath_query_info_t* preprocess_subpaths_queries(Tree* tree) {
+	// pointer from each node to the root of its cp
+	Tree::Node** cp_roots = new Tree::Node*[tree->get_nodes_num()];
+	cp_roots[0] = tree->get_root();
+	for (size_t i = 1; i < tree->get_nodes_num(); i++) {
+		Tree::Node* node = tree->get_node(i);
+		if (node->pos_in_parent == 0) {
+			cp_roots[i] = cp_roots[node->parent->id];
+		} else {
+			cp_roots[i] = node;
+		}
+	}
+
+	rmq_t** cp_rmqs = new rmq_t*[tree->get_nodes_num()];
+	for (size_t i = 0; i < tree->get_nodes_num(); i++) {
+		cp_rmqs[i] = new rmq_t;
+		cp_rmqs[cp_roots[i]->id]->v.push_back(-tree->get_node(i)->weight);
+	}
+	for (size_t i = 0; i < tree->get_nodes_num(); i++) {
+		if (cp_rmqs[i]->v.size() > 1) {
+			rmq_preprocess(cp_rmqs[i], cp_rmqs[i]->v); // TODO: the rmq API needs some revisiting
+		}
+	}
+
+	//int* depths = new int[tree->get_nodes_num()]; //TODO: think about externalizing depths
+	depths[0] = 0; // root depth
+	for (size_t i = 1; i < tree->get_nodes_num(); i++) {
+		depths[i] = 1 + depths[tree->get_node(i)->parent->id];
+	}
+
+	rmq_t** leaf_rmqs = new rmq_t*[Tree::get_taxas_num()];
+	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
+		Tree::Node* curr = tree->get_leaf(i)->parent;
+		leaf_rmqs[i] = new rmq_t;
+		while (curr != NULL) {
+			rmq_t* currpath_rmq = cp_rmqs[cp_roots[curr->id]->id];
+			int query_endp = depths[curr->id] - depths[cp_roots[curr->id]->id];
+			leaf_rmqs[i]->v.push_back(currpath_rmq->v[rmq(currpath_rmq, 0, query_endp)]);
+			curr = cp_roots[curr->id]->parent;
+		}
+		if (leaf_rmqs[i]->v.size() > 1) { // FIXME: if size(v) is 1, rmq_preprocess crashes.
+			rmq_preprocess(leaf_rmqs[i], leaf_rmqs[i]->v);
+		}
+	}
+
+	return new subpath_query_info_t(cp_roots, cp_rmqs);
+}
+
+int max_subpath_query(subpath_query_info_t* subpq_info, Tree::Node* ancestor, Tree::Node* descendant) { // TODO: we might need only ids
+	Tree::Node* curr = descendant;
+	int res = 0;
+	while (subpq_info->cp_roots[curr->secondary_id] != subpq_info->cp_roots[ancestor->secondary_id]) {
+		rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
+		int query_endp = depths[curr->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
+		if (query_endp == 0) {
+			res = std::min(res, currpath_rmq->v[0]);
+		} else {
+			res = std::min(res, currpath_rmq->v[rmq(currpath_rmq, 0, query_endp)]);
+		}
+		curr = subpq_info->cp_roots[curr->secondary_id]->parent;
+	}
+	rmq_t* currpath_rmq = subpq_info->cp_rmqs[subpq_info->cp_roots[curr->secondary_id]->id];
+	int query_startp = depths[ancestor->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
+	int query_endp = depths[curr->secondary_id] - depths[subpq_info->cp_roots[curr->secondary_id]->id];
+	if (query_startp < query_endp) {
+		res = std::min(res, currpath_rmq->v[rmq(currpath_rmq, query_startp+1, query_endp)]);
+	}
+	return -res;
+}
+
+
 // leaves in marked must be sorted in left-to-right order
 Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think about externalizing depths and lca_t
 	if (marked.empty()) return NULL;
@@ -290,13 +369,15 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 	assert(tree_nodes[root_pos]->parent == NULL);
 
 	// insert special nodes TODO: RMQ
+	subpath_query_info_t* subpq_info = preprocess_subpaths_queries(tree); // TODO: should not go here
+
 	size_t newtree_nodes = new_tree->get_nodes_num();
 	for (size_t i = 0; i < newtree_nodes; i++) {
 		Tree::Node* curr_node = new_tree->get_node(i);
 		Tree::Node* orig_node = tree->get_node(curr_node->secondary_id);
 
 		if (curr_node->is_root() || orig_node->is_root()) continue;
-		int w = 0, par_sid = curr_node->parent->secondary_id, sec_id;
+		int w = 0, par_sid = curr_node->parent->secondary_id, sec_id = -1;
 		orig_node = orig_node->parent;
 		while (orig_node->id != par_sid) {
 			if (w < orig_node->weight) {
@@ -307,6 +388,15 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		}
 
 		if (w > 0) {
+			Tree::Node* desc_par = tree->get_node(curr_node->secondary_id)->parent;
+			int msq = max_subpath_query(subpq_info, curr_node->parent, desc_par);
+			if (msq != w) {
+				std::cout << tree->to_string() << std::endl;
+				std::cout << curr_node->parent->secondary_id << " " << desc_par->secondary_id << std::endl;
+				std::cout << w << " " << msq << std::endl;
+			}
+			assert(msq == w);
+
 			Tree::Node* sp_node = new_tree->add_node();
 			sp_node->weight = w;
 			sp_node->secondary_id = sec_id;
@@ -617,10 +707,12 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 
 	for (size_t i = 0; i < trees.size(); i++) {
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
-		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
+		//taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
 
+		orig_t2 = trees[i];
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
-		filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
+		filter_clusters_nlog2n(T->get_root(), trees[i], tr_T, lca_preps[i], to_del_t);
+		//filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
 		T->delete_nodes(to_del_t); // TODO: could be moved outside?
 	}
 

@@ -25,7 +25,16 @@ struct lca_t {
 };
 
 
+inline void resize_to_logmul(std::vector<int>& v) {
+	int log_size = int_log2(v.size());
+	if (v.size() % log_size != 0)
+		v.resize((v.size()/log_size + 1)*log_size, v[v.size()-1]+1);
+}
+
 inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
+
+	resize_to_logmul(v);
+
 	size_t size = v.size();
 	int block_size = int_log2(size);
 	int blocks = size / block_size + (size % block_size != 0);
@@ -79,6 +88,7 @@ inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 			}
 		}
 
+		// TODO: what is this?
 		for (int j = 0; j < block_size; j++) {
 			for (int k = j; k < block_size; k++) {
 				int min_pos = j;
@@ -160,12 +170,6 @@ inline void eulerian_walk(Tree::Node* node, std::vector<int>& E, std::vector<int
 		E.push_back(node->id);
 		L.push_back(depth);
 	}
-}
-
-inline void resize_to_logmul(std::vector<int>& v) {
-	int log_size = int_log2(v.size());
-	if (v.size() % log_size != 0)
-		v.resize((v.size()/log_size + 1)*log_size, v[v.size()-1]+1);
 }
 
 inline lca_t* lca_preprocess(Tree* t) {
