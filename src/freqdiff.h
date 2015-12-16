@@ -11,6 +11,7 @@
 #include <iostream>
 #include <queue>
 #include <cassert>
+#include <boost/dynamic_bitset.hpp>
 
 #include "taxas_ranges.h"
 #include "lca_preprocessing.h"
@@ -19,19 +20,12 @@
 #include "Tree.h"
 
 struct node_bitvec_t {
-	int tree_id, node_id;
-	bool* bitvec;
+	Tree::Node* node;
+	int bitvec_id;
 
-	node_bitvec_t() : tree_id(-1), node_id(-1), bitvec(NULL) {}
-	node_bitvec_t(int tree_id, int node_id, bool* bitvec) : tree_id(tree_id), node_id(node_id), bitvec(bitvec) {}
+	node_bitvec_t() : node(NULL), bitvec_id(-1) {}
+	node_bitvec_t(Tree::Node* node, int bitvec_id) : node(node), bitvec_id(bitvec_id) {}
 };
-
-inline bool equal(bool* bitv1, bool* bitv2, size_t size) {
-	for (size_t i = 0; i < size; i++) {
-		if (bitv1[i] != bitv2[i]) return false;
-	}
-	return true;
-}
 
 struct subpath_query_info_t {
 	Tree::Node** cp_roots;
@@ -50,10 +44,23 @@ int* depths;
 Tree::Node** left,** right;
 size_t* orig_pos_in_parent;
 
+size_t* counter;
+bool* BT;
+int* leaf_p_index;
+
+
 // calculate cluster weights using kn^2 method
 void calc_w_kn2(std::vector<Tree*>& trees) {
+
+	int tot_int_nodes = 0;
+	for (Tree* tree : trees) {
+		tot_int_nodes += tree->get_nodes_num() - Tree::get_taxas_num() - 1;
+	}
+
 	// Generate bit vectors
-	std::vector<node_bitvec_t> bitvectors;
+	node_bitvec_t* node_bitvecs = new node_bitvec_t[tot_int_nodes];
+	boost::dynamic_bitset<>* bitvectors = new boost::dynamic_bitset<>[tot_int_nodes];
+	int bitvc = 0;
 	size_t n = Tree::get_taxas_num();
 	for (size_t t = 0; t < trees.size(); t++) {
 		Tree* tree = trees[t];
@@ -64,39 +71,38 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 			Tree::Node* node = tree->get_node(i);
 			if (!node->is_leaf()) {
 				// fill bit vector for current node
-				bool* bitvector = new bool[n];
-				std::fill(bitvector, bitvector+n, 0);
+				node_bitvec_t node_bitvec(node, bitvc);
+				//bitvectors.emplace_back(Tree::get_taxas_num());
+				bitvectors[bitvc] = boost::dynamic_bitset<>(Tree::get_taxas_num());
 				for (int j = tr->intervals[node->id].start; j <= tr->intervals[node->id].end; j++) {
-					bitvector[tr->taxas[j]] = 1;
+					bitvectors[bitvc].set(tr->taxas[j]);
 				}
-				node_bitvec_t node_bitvec(t, node->id, bitvector);
-				bitvectors.push_back(node_bitvec);
+				node_bitvecs[bitvc] = node_bitvec;
+				bitvc++;
 			}
 		}
 	}
 
 	// Sort bit vectors
-	int bitvc = bitvectors.size();
-	node_bitvec_t* bit0 = new node_bitvec_t[bitvc];
-	std::copy(bitvectors.begin(), bitvectors.end(), bit0);
+	node_bitvec_t* bit0 = node_bitvecs;//new node_bitvec_t[bitvc];
 	node_bitvec_t* bit1 = new node_bitvec_t[bitvc];
 	int bit0c = 0, bit1c = 0;
 
 	for (int i = n-1; i >= 0; i--) {
 		for (int j = 0; j < bitvc; j++) {
-			if (bit0[j].bitvec[i] == 1) {
+			if (bitvectors[bit0[j].bitvec_id].test(i)) {
 				bit1[bit1c++] =  bit0[j];
 				// we signal that this position is free as the occupant had the curr bit set to 1
-				bit0[j].bitvec = NULL;
+				bit0[j].node = NULL;
 			}
 		}
 		for (int j = 0; j < bitvc; j++) {
-			if (bit0[j].bitvec != NULL) {
+			if (bit0[j].node != NULL) {
 				bit0[bit0c++] = bit0[j];
 			}
 		}
 		for (int j = 0; j < bit1c; j++) {
-			if (bit1[j].bitvec != NULL) {
+			if (bit1[j].node != NULL) {
 				bit0[bit0c++] = bit1[j];
 			}
 		}
@@ -107,13 +113,14 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 	// count adjacent equal bitvectors and set weights
 	for (int i = 0; i < bitvc; ) {
 		int w = 1;
-		while (i+w < bitvc && equal(bit0[i].bitvec,bit0[i+w].bitvec,n)) w++;
+		while (i+w < bitvc && bitvectors[bit0[i].bitvec_id] == bitvectors[bit0[i+w].bitvec_id]) w++;
 		for (int j = i; j < i+w; j++) {
-			trees[bit0[j].tree_id]->get_node(bit0[j].node_id)->weight = w;
+			bit0[j].node->weight = w;
 		}
 		i += w;
 	}
 
+	delete[] bitvectors;
 	delete[] bit0;
 	delete[] bit1;
 }
@@ -145,7 +152,8 @@ void compute_start_stop(Tree* tree1, Tree* tree2, int* t2_leaves_ranks) {
 void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_ranges_t* t2_tr, lca_t* t2_lcas,
 		bool* to_del) {
 
-	compute_start_stop(tree1, tree2, t2_tr->ranks);
+	int* t2_ranks = get_taxas_ranks(t2_tr);
+	compute_start_stop(tree1, tree2, t2_ranks);
 
 	// mark clusters in t1 to be deleted if a heavier incompatible cluster is in t2
 	for (size_t i = 1; i < tree1->get_nodes_num(); i++) {
@@ -180,7 +188,6 @@ void filter_clusters_n2(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, taxas_r
 						break;
 					}
 					curr = curr->parent;
-
 				}
 			}
 			if (to_del[i])
@@ -220,7 +227,7 @@ subpath_query_info_t* preprocess_subpaths_queries(Tree* tree) {
 		depths[i] = 1 + depths[tree->get_node(i)->parent->id];
 	}
 
-	rmq_t** leaf_rmqs = new rmq_t*[Tree::get_taxas_num()];
+	/*rmq_t** leaf_rmqs = new rmq_t*[Tree::get_taxas_num()]; TODO
 	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
 		Tree::Node* curr = tree->get_leaf(i)->parent;
 		leaf_rmqs[i] = new rmq_t;
@@ -233,7 +240,7 @@ subpath_query_info_t* preprocess_subpaths_queries(Tree* tree) {
 		if (leaf_rmqs[i]->v.size() > 1) { // FIXME: if size(v) is 1, rmq_preprocess crashes.
 			rmq_preprocess(leaf_rmqs[i], leaf_rmqs[i]->v);
 		}
-	}
+	}*/
 
 	return new subpath_query_info_t(cp_roots, cp_rmqs);
 }
@@ -261,17 +268,16 @@ int max_subpath_query(subpath_query_info_t* subpq_info, Tree::Node* ancestor, Tr
 }
 
 
+subpath_query_info_t* subpq_info; // TODO: temporary
+lca_t* lca_prep;
 // leaves in marked must be sorted in left-to-right order
 Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think about externalizing depths and lca_t
 	if (marked.empty()) return NULL;
 
-	int* depths = new int[tree->get_nodes_num()];
 	depths[0] = 0; // root depth
 	for (size_t i = 1; i < tree->get_nodes_num(); i++) {
 		depths[i] = 1 + depths[tree->get_node(i)->parent->id];
 	}
-
-	lca_t* lca_prep = lca_preprocess(tree);
 
 	std::vector<int> levels, ids;
 	levels.push_back(depths[tree->get_leaf(marked[0])->id]);
@@ -368,38 +374,19 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 	new_tree->fix_tree(tree_nodes[root_pos]); // TODO: could it be done only once at the end?
 	assert(tree_nodes[root_pos]->parent == NULL);
 
-	// insert special nodes TODO: RMQ
-	subpath_query_info_t* subpq_info = preprocess_subpaths_queries(tree); // TODO: should not go here
-
+	// insert special nodes
 	size_t newtree_nodes = new_tree->get_nodes_num();
 	for (size_t i = 0; i < newtree_nodes; i++) {
 		Tree::Node* curr_node = new_tree->get_node(i);
-		Tree::Node* orig_node = tree->get_node(curr_node->secondary_id);
 
-		if (curr_node->is_root() || orig_node->is_root()) continue;
-		int w = 0, par_sid = curr_node->parent->secondary_id, sec_id = -1;
-		orig_node = orig_node->parent;
-		while (orig_node->id != par_sid) {
-			if (w < orig_node->weight) {
-				w = orig_node->weight;
-				sec_id = orig_node->id;
-			}
-			orig_node = orig_node->parent;
-		}
+		if (curr_node->is_root()) continue;
 
-		if (w > 0) {
-			Tree::Node* desc_par = tree->get_node(curr_node->secondary_id)->parent;
-			int msq = max_subpath_query(subpq_info, curr_node->parent, desc_par);
-			if (msq != w) {
-				std::cout << tree->to_string() << std::endl;
-				std::cout << curr_node->parent->secondary_id << " " << desc_par->secondary_id << std::endl;
-				std::cout << w << " " << msq << std::endl;
-			}
-			assert(msq == w);
-
+		Tree::Node* desc_par = tree->get_node(curr_node->secondary_id)->parent;
+		int msq = max_subpath_query(subpq_info, curr_node->parent, desc_par);
+		if (msq > 0) {
 			Tree::Node* sp_node = new_tree->add_node();
-			sp_node->weight = w;
-			sp_node->secondary_id = sec_id;
+			sp_node->weight = msq;
+			sp_node->secondary_id = curr_node->parent->secondary_id;
 			curr_node->parent->null_child(curr_node->pos_in_parent);
 			curr_node->parent->add_child(sp_node);
 			sp_node->add_child(curr_node);
@@ -418,17 +405,9 @@ bool is_special(Tree::Node* node) {
 void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas,
 		bool* to_del) {
 
-	size_t* counter = new size_t[Tree::get_taxas_num()*2];
-	std::fill(counter, counter+Tree::get_taxas_num()*2, 0);
-
-	bool* BT = new bool[Tree::get_taxas_num()*2];
-	std::fill(BT, BT+Tree::get_taxas_num()*2, false);
-
-	int* leaf_p_index = new int[Tree::get_taxas_num()];
-	std::fill(leaf_p_index, leaf_p_index+Tree::get_taxas_num(), -1);
+	//std::fill(leaf_p_index, leaf_p_index+Tree::get_taxas_num(), -1);
 
 	std::priority_queue<std::pair<int, int> > BTw;
-	taxas_ranges_t* t2_tr = build_taxas_ranges(orig_t2);
 
 	Tree::Node* curr = t1_root;
 	while (!curr->is_leaf()) {
@@ -437,11 +416,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 
 	int beta = 0;
 
-	// T_2[p_1] should is "initialized" separately
 	Tree::Node* rim1 = tree2->get_leaf(curr->taxa);
-	counter[rim1->parent->id] = 1;
-	rim1 = rim1->parent;
-
 	curr = curr->parent;
 	Tree::Node* p_2 = curr;
 
@@ -449,6 +424,8 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	int p_index = 0;
 
 	// build sorted sets of leaves
+	leaf_p_index[t1_tr->taxas[t1_tr->intervals[t1_root->id].start]] = -1; // p_1 must be ignored
+
 	std::vector<Tree::Node*> st_roots;
 	while (curr != t1_root->parent) {
 		for (size_t i = 1; i < curr->get_children_num(); i++) {
@@ -462,10 +439,13 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 		}
 		curr = curr->parent;
 	}
+	taxas_ranges_t* t2_tr = build_taxas_ranges(tree2);
 	std::vector<int>* leaves_sets = new std::vector<int>[p_index];
-	for (size_t i = 0; i < Tree::get_taxas_num(); i++) {
+	for (size_t i = 0; i < t2_tr->taxas_num; i++) {
 		if (leaf_p_index[t2_tr->taxas[i]] >= 0) {
 			leaves_sets[leaf_p_index[t2_tr->taxas[i]]].push_back(t2_tr->taxas[i]);
+		} else {
+			assert(t2_tr->taxas[i] == t1_tr->taxas[t1_tr->intervals[t1_root->id].start]);
 		}
 	}
 
@@ -477,6 +457,13 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 			filter_clusters_nlog2n(st_roots[i], contracted, t1_tr, lca_ct2, to_del);
 		}
 	}
+
+	std::fill(BT, BT+tree2->get_nodes_num(), false);
+	std::fill(counter, counter+tree2->get_nodes_num(), 0);
+
+	// T_2[p_1] should is "initialized" separately
+	counter[rim1->parent->id] = 1;
+	rim1 = rim1->parent;
 
 	/* Handle centroid path */
 	int curr_t1_start = t1_tr->intervals[t1_root->id].start + 1;
@@ -523,6 +510,7 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 
 		std::pair<int, int> top;
 		while (!BTw.empty()) {
+
 			top = BTw.top();
 			if (BT[top.second]) break;
 			BTw.pop();
@@ -576,7 +564,8 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 	}
 
 	taxas_ranges_t* t2_tr = build_taxas_ranges(tree2);
-	compute_start_stop(tree1, tree2, t2_tr->ranks);
+	int* t2_ranks = get_taxas_ranks(t2_tr);
+	compute_start_stop(tree1, tree2, t2_ranks);
 
 	// calc depth
 	depths[0] = 0; // root depth
@@ -638,7 +627,10 @@ void merge_trees(Tree* tree1, Tree* tree2, taxas_ranges_t* t1_tr, lca_t* t2_lcas
 	tree2->fix_tree();
 }
 
-Tree* freqdiff(std::vector<Tree*>& trees) {
+Tree* freqdiff(std::vector<Tree*>& trees, bool centroid_paths) {
+
+	//if (centroid_paths)
+	//	std::cout << "Using centroid paths version" << std::endl;
 
 	start = new int[Tree::get_taxas_num()*2];
 	stop = new int[Tree::get_taxas_num()*2];
@@ -654,6 +646,10 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 	left = new Tree::Node*[Tree::get_taxas_num()];
 	right = new Tree::Node*[Tree::get_taxas_num()];
 	orig_pos_in_parent = new size_t[Tree::get_taxas_num()*2];
+
+	BT = new bool[Tree::get_taxas_num()*2];
+	counter = new size_t[Tree::get_taxas_num()*2];
+	leaf_p_index = new int[Tree::get_taxas_num()];
 
 	// weights[i][node id] = weights of cluster of node (with node id) in tree i
 	// initialize all to "number of trees" because trivial clusters will have that value
@@ -672,6 +668,7 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 
 	Tree* T = new Tree(trees[0]);
 	for (size_t i = 1; i < trees.size(); i++) {
+		//std::cout << i << std::endl;
 		Tree* Ti = new Tree(trees[i]);
 		taxas_ranges_t* tr_Ti = build_taxas_ranges(Ti);
 
@@ -681,13 +678,25 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 		lca_t* lca_T = lca_preprocess(T);
 
 		// filter clusters
-		orig_t2 = T; // TODO: temporary
 		std::fill(to_del_ti, to_del_ti+Ti->get_nodes_num(), false);
-		filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
+		if (centroid_paths) {
+			orig_t2 = T; // TODO: temporary
+			subpq_info = preprocess_subpaths_queries(T);
+			lca_prep = lca_preprocess(T);
+			filter_clusters_nlog2n(Ti->get_root(), T, tr_Ti, lca_T, to_del_ti);
+		} else {
+			filter_clusters_n2(Ti, T, tr_Ti, tr_T, lca_T, to_del_ti);
+		}
 
-		orig_t2 = Ti; // TODO: temporary
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
-		filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
+		if (centroid_paths) {
+			orig_t2 = Ti; // TODO: temporary
+			lca_prep = lca_preprocess(Ti);
+			subpq_info = preprocess_subpaths_queries(Ti);
+			filter_clusters_nlog2n(T->get_root(), Ti, tr_T, lca_preps[i], to_del_t);
+		} else {
+			filter_clusters_n2(T, Ti, tr_T, tr_Ti, lca_preps[i], to_del_t);
+		}
 
 		Ti->delete_nodes(to_del_ti);
 		T->delete_nodes(to_del_t);
@@ -702,17 +711,22 @@ Tree* freqdiff(std::vector<Tree*>& trees) {
 			T->get_node(j)->secondary_id = T->get_node(j)->id;
 		}
 
-		// delete Ti;
+		//delete Ti;
 	}
 
 	for (size_t i = 0; i < trees.size(); i++) {
 		taxas_ranges_t* tr_T = build_taxas_ranges(T);
-		//taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
+		taxas_ranges_t* tr_Ti = build_taxas_ranges(trees[i]);
 
-		orig_t2 = trees[i];
 		std::fill(to_del_t, to_del_t+T->get_nodes_num(), false);
-		filter_clusters_nlog2n(T->get_root(), trees[i], tr_T, lca_preps[i], to_del_t);
-		//filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
+		if (centroid_paths) {
+			orig_t2 = trees[i];
+			lca_prep = lca_preprocess(trees[i]);
+			subpq_info = preprocess_subpaths_queries(trees[i]); // TODO: should not go here
+			filter_clusters_nlog2n(T->get_root(), trees[i], tr_T, lca_preps[i], to_del_t);
+		} else {
+			filter_clusters_n2(T, trees[i], tr_T, tr_Ti, lca_preps[i], to_del_t);
+		}
 		T->delete_nodes(to_del_t); // TODO: could be moved outside?
 	}
 

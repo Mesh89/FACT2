@@ -52,7 +52,7 @@ Tree::Tree(Tree* other) {
 	}
 }
 
-Tree::~Tree() {}
+Tree::~Tree() {} // TODO: implement
 
 std::string Tree::to_string() {
 	std::stringstream ss;
@@ -90,10 +90,17 @@ Tree::Node* Tree::get_leaf(int taxa) {
 	return taxa_to_leaf_map[taxa];
 }
 
+size_t Tree::get_leaves_num() {
+	// assert(taxa_to_leaf_map.size() == taxa_to_leaf.size()); TODO: why?
+	return taxa_to_leaf.size();
+}
+
 Tree::Node* Tree::add_node(int taxa) {
 	Tree::Node* newnode = new Tree::Node(get_nodes_num(), taxa);
 	nodes.push_back(newnode);
 	if (taxa >= 0) {
+		// taxa_to_leaf.insert(taxa_to_leaf.begin()+taxa, newnode); TODO
+		taxa_to_leaf.push_back(0);
 		taxa_to_leaf_map[taxa] = newnode;
 	}
 	return newnode;
@@ -150,7 +157,9 @@ void Tree::reorder() {
 				heaviest = i;
 			}
 		}
+		//std::cout << "A " << node->id << " " << heaviest << " " << node->children.size() << " " << node->is_leaf() << std::endl;
 		Tree::Node* heaviest_node = node->children[heaviest];
+		//std::cout << "B" << std::endl;
 		node->set_child(node->children[0], heaviest);
 		node->set_child(heaviest_node, 0);
 	}

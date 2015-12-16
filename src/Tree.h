@@ -22,6 +22,7 @@ public:
 	size_t get_nodes_num();
 
 	Node* get_leaf(int taxa);
+	size_t get_leaves_num();
 
 	Tree::Node* add_node(int taxa = -1);
 	void delete_nodes(bool* to_delete);

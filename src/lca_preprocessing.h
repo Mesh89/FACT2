@@ -70,6 +70,7 @@ inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 		}
 	}
 
+	int blocks_allocated = 0;
 	rmq_prep->prep_blocks.resize(size, NULL);
 	for (int i = 0; i < blocks; i++) {
 		int address = 0;
@@ -82,6 +83,7 @@ inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 
 		if (rmq_prep->prep_blocks[address] == NULL) {
 			rmq_prep->prep_blocks[address] = alloc_int_matrix(block_size);
+			blocks_allocated++;
 			for (int j = 0; j < block_size; j++) {
 				rmq_prep->prep_blocks[address][j][j] = j;
 				for (int k = j+1; k < block_size; k++) {
@@ -197,6 +199,7 @@ inline int general_rmq(gen_rmq_t* gen_rmq_prep, int a, int b) {
 
 
 inline void general_rmq_preprocess(gen_rmq_t* gen_rmq_prep) {
+
 	Tree* cartesian = new Tree;
 	std::vector<Tree::Node*> orig_pos;
 	Tree::Node* start = cartesian->add_node();
@@ -235,6 +238,8 @@ inline void general_rmq_preprocess(gen_rmq_t* gen_rmq_prep) {
 	}
 
 	gen_rmq_prep->lca_prep = lca_preprocess(cartesian);
+
+	delete cartesian;
 }
 
 
