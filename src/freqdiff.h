@@ -62,8 +62,7 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 	boost::dynamic_bitset<>* bitvectors = new boost::dynamic_bitset<>[tot_int_nodes];
 	int bitvc = 0;
 	size_t n = Tree::get_taxas_num();
-	for (size_t t = 0; t < trees.size(); t++) {
-		Tree* tree = trees[t];
+	for (Tree* tree : trees) {
 		taxas_ranges_t* tr = build_taxas_ranges(tree);
 
 		size_t nodes_num = tree->get_nodes_num();
@@ -123,6 +122,72 @@ void calc_w_kn2(std::vector<Tree*>& trees) {
 	delete[] bitvectors;
 	delete[] bit0;
 	delete[] bit1;
+}
+
+
+void calc_w_k2n(std::vector<Tree*>& trees) {
+
+	int* e = new int[Tree::get_taxas_num()];
+	std::pair<int,int>* clusters = new std::pair<int,int>[Tree::get_taxas_num()*2];
+	std::pair<int,int>* H = new std::pair<int,int>[Tree::get_taxas_num()*2];
+	Tree::Node** H2node = new Tree::Node*[Tree::get_taxas_num()*2];
+	std::pair<int,int>* minmax = new std::pair<int,int>[Tree::get_taxas_num()*2];
+	for (Tree* tree : trees) {
+		// calculate e
+		int count = 0;
+		for (size_t i = 0; i < tree->get_nodes_num(); i++) {
+			if (tree->get_node(i)->is_leaf()) {
+				e[tree->get_node(i)->taxa] = count++;
+			}
+		}
+
+		// calculate L and R for each cluster
+		for (int i = tree->get_nodes_num()-1; i > 0; i--) {
+			Tree::Node* node = tree->get_node(i);
+			if (node->is_leaf()) {
+				clusters[i].first = clusters[i].second = e[node->taxa];
+			} else {
+				clusters[i].first = clusters[node->children[0]->id].first;
+				clusters[i].second = clusters[(*node->children.rbegin())->id].second;
+
+				int pos;
+				pos = node->pos_in_parent == node->parent->get_children_num()-1 ? clusters[i].first : clusters[i].second;
+				H[pos] = clusters[i];
+				H2node[pos] = node;
+			}
+		}
+
+		// for each tree, see if cluster is in our ref tree, and if so increase its count by 1
+		for (Tree* tree2 : trees) {
+			std::fill(minmax, minmax+tree2->get_nodes_num(), std::pair<int,int>(INT32_MAX, 0));
+			for (int i = tree2->get_nodes_num()-1; i > 0; i--) {
+				Tree::Node* node = tree2->get_node(i);
+				if (node->is_leaf()) {
+					minmax[i].first = minmax[i].second = e[node->taxa];
+				}
+
+				if (minmax[node->parent->id].first > minmax[i].first) {
+					minmax[node->parent->id].first = minmax[i].first;
+				}
+				if (minmax[node->parent->id].second < minmax[i].second) {
+					minmax[node->parent->id].second = minmax[i].second;
+				}
+
+				if (!node->is_leaf() && minmax[i].second-minmax[i].first+1 == (int) node->size) {
+					if (H[minmax[i].first] == minmax[i]) {
+						H2node[minmax[i].first]->weight++;
+					} else if (H[minmax[i].second] == minmax[i]) {
+						H2node[minmax[i].second]->weight++;
+					}
+				}
+			}
+		}
+	}
+	delete[] e;
+	delete[] clusters;
+	delete[] H;
+	delete[] H2node;
+	delete[] minmax;
 }
 
 
@@ -274,10 +339,10 @@ lca_t* lca_prep;
 Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think about externalizing depths and lca_t
 	if (marked.empty()) return NULL;
 
-	depths[0] = 0; // root depth
+	/*depths[0] = 0; // root depth
 	for (size_t i = 1; i < tree->get_nodes_num(); i++) {
 		depths[i] = 1 + depths[tree->get_node(i)->parent->id];
-	}
+	}*/
 
 	std::vector<int> levels, ids;
 	levels.push_back(depths[tree->get_leaf(marked[0])->id]);
@@ -344,8 +409,6 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 		}
 	}
 
-	assert(root_pos >= 0);
-
 	Tree* new_tree = new Tree();
 	std::vector<Tree::Node*> tree_nodes(levels.size(), NULL);
 	for (size_t i = 0; i < levels.size(); i++) {
@@ -372,7 +435,6 @@ Tree* contract_tree_fast(Tree* tree, std::vector<int>& marked) {	//TODO: think a
 	}
 
 	new_tree->fix_tree(tree_nodes[root_pos]); // TODO: could it be done only once at the end?
-	assert(tree_nodes[root_pos]->parent == NULL);
 
 	// insert special nodes
 	size_t newtree_nodes = new_tree->get_nodes_num();
@@ -444,8 +506,6 @@ void filter_clusters_nlog2n(Tree::Node* t1_root, Tree* tree2, taxas_ranges_t* t1
 	for (size_t i = 0; i < t2_tr->taxas_num; i++) {
 		if (leaf_p_index[t2_tr->taxas[i]] >= 0) {
 			leaves_sets[leaf_p_index[t2_tr->taxas[i]]].push_back(t2_tr->taxas[i]);
-		} else {
-			assert(t2_tr->taxas[i] == t1_tr->taxas[t1_tr->intervals[t1_root->id].start]);
 		}
 	}
 
@@ -652,14 +712,18 @@ Tree* freqdiff(std::vector<Tree*>& trees, bool centroid_paths) {
 	leaf_p_index = new int[Tree::get_taxas_num()];
 
 	// weights[i][node id] = weights of cluster of node (with node id) in tree i
-	// initialize all to "number of trees" because trivial clusters will have that value
+	// initialize leaves and roots to "number of trees" because trivial clusters will have that value
+	calc_w_k2n(trees);
 	for (size_t i = 0; i < trees.size(); i++) {
 		for (size_t j = 0; j < trees[i]->get_nodes_num(); j++) {
-			trees[i]->get_node(j)->weight = trees.size();
+			Tree::Node* node = trees[i]->get_node(j);
+			if (node->is_root() || node->is_leaf()) {
+				node->weight = trees.size();
+			}
 		}
 		trees[i]->reorder();
 	}
-	calc_w_kn2(trees);
+	//calc_w_kn2(trees);
 
 	lca_t** lca_preps = new lca_t*[trees.size()];
 	for (size_t i = 0; i < trees.size(); i++) {
