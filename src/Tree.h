@@ -4,11 +4,16 @@
 #include <vector>
 #include <unordered_map>
 
+/*
+ * For efficiency reasons, many updates to the tree structure are done in a lazy way
+ * To ensure the tree is in a consistent state, it is necessary to call fix_tree() after every batch of modifications
+ */
+
 class Tree {
 public:
 	static std::unordered_map<int,std::string> taxa_names;
 
-	Tree();
+	Tree(size_t nodes_num_hint = 0);
 	Tree(std::string& newick_str);
 	Tree(Tree* other);
 	virtual ~Tree();
@@ -37,7 +42,8 @@ public:
 
 private:
 	std::vector<Node*> nodes;
-	std::vector<Node*> taxa_to_leaf; // TODO: how much the map reduces performance?
+	//std::vector<Node*> taxa_to_leaf; // TODO: how much the map reduces performance?
+	size_t leaves_num;
 	std::unordered_map<int, Node*> taxa_to_leaf_map;
 
 	static std::unordered_map<std::string,int> taxa_ids;
@@ -58,6 +64,7 @@ public:
 	int id, secondary_id;
 	int taxa, weight;
 	size_t size; // number of leaves in subtree
+	int depth;
 
 	Node(int id);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(NONE), weight(0) {};
 	Node(int id, int taxa);// : parent(NULL), pos_in_parent(NONE), id(id), taxa(taxa), weight(0) {};

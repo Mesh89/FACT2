@@ -11,20 +11,31 @@
 std::unordered_map<std::string,int> Tree::taxa_ids;
 std::unordered_map<int,std::string> Tree::taxa_names;
 
-Tree::Tree() {}
+Tree::Tree(size_t nodes_num_hint) : leaves_num(0) {
+	if (nodes_num_hint > 0) {
+		nodes.reserve(nodes_num_hint);
+	}
+}
 
 Tree::Tree(std::string& newick_str) {
 	const char* str = newick_str.c_str();
 	while (*str != '(') str++;
 	this->build_tree(str);
 
-	taxa_to_leaf.resize(Tree::get_taxas_num());
+	//taxa_to_leaf.resize(Tree::get_taxas_num());
 	for (Node* node : nodes) {
-		if (node->is_leaf())
-			taxa_to_leaf[node->taxa] = node;
+		if (node->is_leaf()) {
+			//taxa_to_leaf[node->taxa] = node;
 			taxa_to_leaf_map[node->taxa] = node;
+			leaves_num++;
+		}
+
+		if (!node->is_root()) {
+			node->depth = node->parent->depth + 1;
+		}
 	}
 
+	// calc sizes
 	for (int i = nodes.size()-1; i > 0 ; i--) {
 		if (nodes[i]->is_leaf()) {
 			nodes[i]->size = 1;
@@ -33,26 +44,31 @@ Tree::Tree(std::string& newick_str) {
 	}
 }
 
-Tree::Tree(Tree* other) {
+Tree::Tree(Tree* other) : leaves_num(other->leaves_num) {
 	nodes.reserve(other->get_nodes_num());
-	taxa_to_leaf.resize(Tree::get_taxas_num());
+	//taxa_to_leaf.resize(Tree::get_taxas_num());
 	for (Node* node : other->nodes) {
 		Tree::Node* newnode = new Node(node->id, node->taxa);
 		newnode->weight = node->weight;
 		newnode->size = node->size;
+		newnode->depth = node->depth;
 		nodes.push_back(newnode);
 
 		if (!node->is_root()) {
 			nodes[node->parent->id]->add_child(newnode);
 		}
 		if (newnode->is_leaf()) {
-			taxa_to_leaf[newnode->taxa] = newnode;
+			//taxa_to_leaf[newnode->taxa] = newnode;
 			taxa_to_leaf_map[newnode->taxa] = newnode;
 		}
 	}
 }
 
-Tree::~Tree() {} // TODO: implement
+Tree::~Tree() {
+	for (Node* node : nodes) {
+		delete node;
+	}
+}
 
 std::string Tree::to_string() {
 	std::stringstream ss;
@@ -91,8 +107,7 @@ Tree::Node* Tree::get_leaf(int taxa) {
 }
 
 size_t Tree::get_leaves_num() {
-	// assert(taxa_to_leaf_map.size() == taxa_to_leaf.size()); TODO: why?
-	return taxa_to_leaf.size();
+	return leaves_num;
 }
 
 Tree::Node* Tree::add_node(int taxa) {
@@ -100,7 +115,7 @@ Tree::Node* Tree::add_node(int taxa) {
 	nodes.push_back(newnode);
 	if (taxa >= 0) {
 		// taxa_to_leaf.insert(taxa_to_leaf.begin()+taxa, newnode); TODO
-		taxa_to_leaf.push_back(0);
+		leaves_num++;
 		taxa_to_leaf_map[taxa] = newnode;
 	}
 	return newnode;
@@ -127,8 +142,11 @@ void Tree::fix_tree(Tree::Node* root) {
 	fix_tree_supp(root);
 
 	// recalc sizes
-	for (size_t i = 0; i < nodes.size(); i++) {
+	nodes[0]->size = 0;
+	nodes[0]->depth = 0;
+	for (size_t i = 1; i < nodes.size(); i++) {
 		nodes[i]->size = 0;
+		nodes[i]->depth = nodes[i]->parent->depth + 1;
 	}
 	for (int i = nodes.size()-1; i > 0 ; i--) {
 		if (nodes[i]->is_leaf()) {
@@ -157,9 +175,7 @@ void Tree::reorder() {
 				heaviest = i;
 			}
 		}
-		//std::cout << "A " << node->id << " " << heaviest << " " << node->children.size() << " " << node->is_leaf() << std::endl;
 		Tree::Node* heaviest_node = node->children[heaviest];
-		//std::cout << "B" << std::endl;
 		node->set_child(node->children[0], heaviest);
 		node->set_child(heaviest_node, 0);
 	}
@@ -211,8 +227,8 @@ int Tree::get_taxa_id(std::string& taxa) {
 	}
 }
 
-Tree::Node::Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(NONE), weight(0), size(0) {}
-Tree::Node::Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(taxa), weight(0), size(0) {}
+Tree::Node::Node(int id) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(NONE), weight(0), size(0), depth(0) {}
+Tree::Node::Node(int id, int taxa) : parent(NULL), pos_in_parent(NONE), id(id), secondary_id(id), taxa(taxa), weight(0), size(0), depth(0) {}
 
 void Tree::Node::fix_children() {
 	size_t curr_pos = 0;

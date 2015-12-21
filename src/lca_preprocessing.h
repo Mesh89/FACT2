@@ -15,6 +15,12 @@ struct rmq_t {
 	int block_size;
 	std::vector<int> addresses;
 	std::vector<int**> prep_blocks;
+
+	~rmq_t() {
+		for (int** block : prep_blocks) {
+			delete[] block;
+		}
+	}
 };
 
 struct lca_t {
@@ -22,11 +28,15 @@ struct lca_t {
 	rmq_t* rmq_prep;
 
 	lca_t() : rmq_prep(new rmq_t) {}
+	~lca_t() { delete rmq_prep;  }
 };
 
 struct gen_rmq_t {
 	lca_t* lca_prep;
 	std::vector<int> v, pos_to_id, id_to_pos;
+
+	gen_rmq_t() : lca_prep(NULL) {}
+	~gen_rmq_t() { delete lca_prep; }
 };
 
 
