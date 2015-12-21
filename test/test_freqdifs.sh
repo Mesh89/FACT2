@@ -2,7 +2,7 @@ k=$1
 n=$2
 while true; do
 	./FACT -g $k $n 0 > trees.nex
-	factres=`./FACT++ trees.nex`
+	factres=`./FACT++ trees.nex 1`
 	
 	python gen_tnt_input.py $n $k trees.nex $factres > tnt_input.tre
 

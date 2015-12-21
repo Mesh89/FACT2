@@ -1,7 +1,7 @@
 import sys
 import re;
 
-print "mxram 3000;"
+print "mxram 1000;"
 print ""
 
 n, k = int(sys.argv[1]), int(sys.argv[2])
