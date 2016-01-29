@@ -17,7 +17,7 @@ Tree::Tree(size_t nodes_num_hint) : leaves_num(0) {
 	}
 }
 
-Tree::Tree(std::string& newick_str) {
+Tree::Tree(std::string& newick_str) : leaves_num(0) {
 	const char* str = newick_str.c_str();
 	while (*str != '(') str++;
 	this->build_tree(str);
