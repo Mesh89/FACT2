@@ -5,14 +5,12 @@
 #include <stack>
 
 inline int** alloc_int_matrix(int n, int v) {
-	int* a = new int[n*n];
-	std::fill(a, a+n*n, v);
-
 	int** m = new int*[n];
-	for (int i = 0; i < n; i++) {
-		m[i] = a+(i*n);
-	}
-	return m;
+    m[0] = new int[n*n];
+    for (int i = 1; i < n; i++)
+        m[i] = m[0] + i*n;
+    std::fill(m[0], m[0]+n*n, v);
+    return m;
 }
 inline int** alloc_int_matrix(int n) {
 	return alloc_int_matrix(n, 0);

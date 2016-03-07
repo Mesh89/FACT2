@@ -18,7 +18,10 @@ struct rmq_t {
 
 	~rmq_t() {
 		for (int** block : prep_blocks) {
-			delete[] block;
+			if (block) {
+				delete[] block[0];
+				delete[] block;
+			}
 		}
 	}
 };
@@ -100,18 +103,6 @@ inline void rmq_preprocess(rmq_t* rmq_prep, std::vector<int>& v) {
 					rmq_prep->prep_blocks[address][j][k] = rmq_prep->prep_blocks[address][j][k-1];
 					if (v[i*block_size + rmq_prep->prep_blocks[address][j][k-1]] > v[i*block_size + k]) {
 						rmq_prep->prep_blocks[address][j][k] = k;
-					}
-				}
-			}
-		}
-
-		// TODO: what is this?
-		for (int j = 0; j < block_size; j++) {
-			for (int k = j; k < block_size; k++) {
-				int min_pos = j;
-				for (int h = j; h <= k; h++) {
-					if (v[i*block_size + min_pos] > v[i*block_size + h]) {
-						min_pos = h;
 					}
 				}
 			}
