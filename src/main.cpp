@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 	//Tree* fdt = freqdiff(trees, Tree::get_taxas_num() > 1000);
 	Tree* minrs = minRS(trees);
 	//cout << fdt->to_newick() << endl;
-	cout << minrs << endl;
+	cout << minrs->to_newick() << endl;
 
 	//delete fdt;
 }

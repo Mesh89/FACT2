@@ -28,7 +28,7 @@ uint dfs(std::vector<int>* adjl, int v, bool* visited) {
 	return comp;
 }
 
-std::vector<uint> build_aho(std::vector<int>& indices, bool*** triplets) {
+std::vector<uint> build_aho(std::vector<int>& indices, int*** triplets) {
 	int n = indices.size();
 	std::vector<int>* adjl = new std::vector<int>[n];
 	for (int i = 0; i < n; i++) {
@@ -40,6 +40,7 @@ std::vector<uint> build_aho(std::vector<int>& indices, bool*** triplets) {
 				if (triplets[ii][ij][ik]) {
 					adjl[i].push_back(j);
 					adjl[j].push_back(i);
+					break;
 				}
 			}
 		}
@@ -60,14 +61,74 @@ std::vector<uint> build_aho(std::vector<int>& indices, bool*** triplets) {
 }
 
 
+void print_bitmask_as_indices(uint bitmask, int len) {
+	std::cout << "( ";
+	for (int i = 0; i < len; i++) {
+		if (bitmask & (1<<i)) {
+			std::cout << Tree::taxa_names[i] << " ";
+		}
+	}
+	std::cout << ")" << std::endl;
+}
+
+
+void print_tree(uint Lbitmask, std::vector<uint>* components, int** dp_backtrack, Tree* tree, Tree::Node* node) {
+
+	print_bitmask_as_indices(Lbitmask, Tree::get_taxas_num());
+
+	int m = components[Lbitmask].size();
+
+	// print singleton elems
+	uint singletons = 0;
+	for (int i = 0; i < m; i++) {
+		singletons |= components[Lbitmask][i];
+	}
+	singletons = Lbitmask & ~singletons;
+	for (uint i = 0; i < Tree::get_taxas_num(); i++) {
+		if (singletons & (1<<i)) {
+			node->add_child(tree->add_node(i));
+		}
+	}
+	if (m == 0) {
+		return;
+	}
+
+	uint Dbitmask = (1 << m)-1;
+	int DmXbitmask = Dbitmask;
+	do {
+		DmXbitmask = dp_backtrack[Lbitmask][(1 << m)-1];
+		uint Xbitmask = Dbitmask & ~DmXbitmask;
+		uint lambdaX = 0;
+		for (int i = 0; i < m; i++) {
+			if (Xbitmask & (1<<i)) {
+				lambdaX |= components[Lbitmask][i];
+			}
+		}
+		Tree::Node* new_node = tree->add_node();
+		node->add_child(new_node);
+		print_tree(lambdaX, components, dp_backtrack, tree, new_node);
+	} while (DmXbitmask >= 0);
+
+	uint lambdaDmX = 0;
+	for (int i = 0; i < m; i++) {
+		if (DmXbitmask & (1<<i)) {
+			lambdaDmX |= components[Lbitmask][i];
+		}
+	}
+	Tree::Node* new_node = tree->add_node();
+	node->add_child(new_node);
+	print_tree(lambdaDmX, components, dp_backtrack, tree, new_node);
+}
+
+
 Tree* minRS(std::vector<Tree*>& trees) {
 	int n = trees[0]->get_taxas_num();
-	bool*** triplets = new bool**[n];
+	int*** triplets = new int**[n];
 	for (int i = 0; i < n; i++) {
-		triplets[i] = new bool*[n];
+		triplets[i] = new int*[n];
 		for (int j = 0; j < n; j++) {
-			triplets[i][j] = new bool[n];
-			std::fill(triplets[i][j], triplets[i][j]+n, false);
+			triplets[i][j] = new int[n];
+			std::fill(triplets[i][j], triplets[i][j]+n, 0);
 		}
 	}
 
@@ -86,16 +147,26 @@ Tree* minRS(std::vector<Tree*>& trees) {
 					if (dlcaij == dlcaik && dlcaij == dlcajk) continue; // fan
 
 					if (dlcaik == dlcajk && dlcaij > dlcaik) { //ij|k
-						triplets[i][j][k] = true;
+						triplets[i][j][k]++;
 					} else if (dlcaij == dlcajk && dlcaik > dlcaij) { //ik|j
-						triplets[i][k][j] = true;
+						triplets[i][k][j]++;
 					} else if (dlcaij == dlcaik && dlcajk > dlcaij) { //jk|i
-						triplets[j][k][i] = true;
+						triplets[j][k][i]++;
 					} else {
 						// should never enter here
 						std::cout << dlcaij << " " << dlcaik << " " << dlcajk << std::endl;
 						assert(false);
 					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			for (int k = 0; k < n; k++) {
+				if (triplets[i][j][k] < (int) trees.size()) {
+					triplets[i][j][k] = 0;
 				}
 			}
 		}
@@ -110,9 +181,15 @@ Tree* minRS(std::vector<Tree*>& trees) {
 	int* dp = new int[states];
 	dp[0] = 0;
 
+	std::vector<uint>* components = new std::vector<uint>[states];
+
+	// dp_backtrack[Lbitmask][Dbitmask] is the bitmask of X (line 8 in the MCFS paper)
+	// if positive, it means DP[D\X] < opt[Merge(D\X)], else the number if negative
+	int** dp_backtrack = new int*[states];
+
 	for (int i = 2; i <= n; i++) {
 		uint Lbitmask = (1 << i)-1; // L' bitmask
-		while ((Lbitmask & (1 << i)) == false) {
+		while ((Lbitmask & (1 << n)) == false) {
 			// indices contains the subset of taxa we are currently dealing with
 			std::vector<int> indices;
 			for (int j = 0; j < n; j++) {
@@ -122,25 +199,26 @@ Tree* minRS(std::vector<Tree*>& trees) {
 			}
 
 			// aho graph components
-			std::vector<uint> components = build_aho(indices, triplets);
-			int m = components.size();
+			components[Lbitmask] = build_aho(indices, triplets);
+			int m = components[Lbitmask].size();
+
+			dp_backtrack[Lbitmask] = new int[1 << m];
 
 			// init dp for single components
 			for (int j = 0; j < m; j++) { // init opt for single taxa
-				dp[1 << j] = opt[components[j]];
+				dp[1 << j] = opt[components[Lbitmask][j]];
 			}
 
 			for (int j = 2; j <= m; j++) {
 				uint Dbitmask = (1 << j)-1; // D bitmask
-				while ((Dbitmask & (1 << j)) == false) {
-					dp[Dbitmask] = INT_MAX;
-
+				while ((Dbitmask & (1 << m)) == false) {
 					std::vector<int> indices2; // D
 					for (int k = 0; k < m; k++) {
 						if (Dbitmask & (1<<k)) {
 							indices2.push_back(k);
 						}
 					}
+					dp[Dbitmask] = INT_MAX;
 
 					int q = indices2.size();
 					uint upper_bm = (1 << q)-1;
@@ -149,15 +227,20 @@ Tree* minRS(std::vector<Tree*>& trees) {
 						uint lambdaDmX = 0; // \Lambda(D\X)
 						for (int k = 0; k < q; k++) {
 							if (Xbitmask & (1<<k)) {
-								lambdaX |= components[indices2[k]];
+								lambdaX |= components[Lbitmask][indices2[k]];
 							} else {
-								lambdaDmX |= components[indices2[k]];
+								lambdaDmX |= components[Lbitmask][indices2[k]];
 							}
 						}
 
-						uint DmXbitmask = ~Xbitmask & upper_bm;
+						uint DmXbitmask = ~Xbitmask & Dbitmask;
 						int min2 = std::min(dp[DmXbitmask], opt[lambdaDmX]);
-						dp[Dbitmask] = std::min(dp[Dbitmask], opt[lambdaX]+min2);
+						if (dp[Dbitmask] > opt[lambdaX]+min2) {
+							dp[Dbitmask] = std::min(dp[Dbitmask], opt[lambdaX]+min2);
+							dp_backtrack[Lbitmask][Dbitmask] = min2 == opt[Dbitmask] ? -DmXbitmask : DmXbitmask;
+							// it is important that whenever DP and opt are the same, we store DmXbitmask as negative
+							// (see print_tree)
+						}
 					}
 
 					uint t = (Dbitmask | (Dbitmask - 1)) + 1;
@@ -175,7 +258,11 @@ Tree* minRS(std::vector<Tree*>& trees) {
 
 	std::cout << opt[states-1] << std::endl;
 
-	return NULL;
+	uint Lbitmask = states-1;
+	Tree* tree = new Tree();
+	print_tree(Lbitmask, components, dp_backtrack, tree, tree->add_node());
+
+	return tree;
 }
 
 
