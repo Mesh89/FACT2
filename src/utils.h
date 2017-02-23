@@ -37,4 +37,8 @@ inline int int_log2(int n) {
 	return targetlevel;
 }
 
+inline int comb2(int n) {
+	return n*(n-1)/2;
+}
+
 #endif /* UTILS_H_ */
