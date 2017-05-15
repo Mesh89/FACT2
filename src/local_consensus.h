@@ -5,8 +5,8 @@
  *      Author: ramesh
  */
 
-#ifndef SRC_MINRS_H_
-#define SRC_MINRS_H_
+#ifndef SRC_LOCAL_CONSENSUS_H_
+#define SRC_LOCAL_CONSENSUS_H_
 
 #include <vector>
 #include <iostream>
@@ -48,6 +48,7 @@ std::vector<uint> build_aho(std::vector<int>& indices, int*** triplets, bool min
 
 	std::vector<uint> components;
 	bool* visited = new bool[n];
+	std::fill(visited, visited+n, false);
 	for (int i = 0; i < n; i++) {
 		if (!visited[i]) {
 			uint comp = dfs(adjl, i, visited, indices);
@@ -56,6 +57,8 @@ std::vector<uint> build_aho(std::vector<int>& indices, int*** triplets, bool min
 			}
 		}
 	}
+	delete[] visited;
+	delete[] adjl;
 
 	return components;
 }
@@ -92,6 +95,11 @@ void print_tree(uint Lbitmask, std::vector<uint>* components, int** dp_backtrack
 
 	if (m == 0) {
 		return;
+	} else if (m == 1) {
+		Tree::Node* new_node = tree->add_node();
+		node->add_child(new_node);
+		print_tree(components[Lbitmask][0], components, dp_backtrack, tree, new_node, minrs);
+		return;
 	}
 
 	uint Dbitmask = (1 << m)-1;
@@ -109,7 +117,6 @@ void print_tree(uint Lbitmask, std::vector<uint>* components, int** dp_backtrack
 		}
 
 		if (!minrs && std::bitset<32>(lambdaX).count() == 1) {
-			//std::cout << std::bitset<10>(lambdaX) << std::endl;
 			for (uint i = 0; i < Tree::get_taxas_num(); i++) {
 				if (lambdaX & (1<<i)) {
 					node->add_child(tree->add_node(i));
@@ -134,7 +141,6 @@ void print_tree(uint Lbitmask, std::vector<uint>* components, int** dp_backtrack
 	}
 
 	if (!minrs && std::bitset<32>(lambdaX).count() == 1) {
-		//std::cout << std::bitset<10>(lambdaX) << std::endl;
 		for (uint i = 0; i < Tree::get_taxas_num(); i++) {
 			if (lambdaX & (1<<i)) {
 				node->add_child(tree->add_node(i));
@@ -148,7 +154,7 @@ void print_tree(uint Lbitmask, std::vector<uint>* components, int** dp_backtrack
 }
 
 
-Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
+int*** get_common_triplets(std::vector<Tree*>& trees) {
 	int n = trees[0]->get_taxas_num();
 	int*** triplets = new int**[n];
 	for (int i = 0; i < n; i++) {
@@ -171,6 +177,7 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 					int dlcaik = tree->get_node(lca(lca_prep, leafi->id, leafk->id))->depth;
 					int dlcajk = tree->get_node(lca(lca_prep, leafj->id, leafk->id))->depth;
 
+
 					if (dlcaij == dlcaik && dlcaij == dlcajk) continue; // fan
 
 					if (dlcaik == dlcajk && dlcaij > dlcaik) { //ij|k
@@ -187,6 +194,7 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 				}
 			}
 		}
+		delete lca_prep;
 	}
 
 	for (int i = 0; i < n; i++) {
@@ -198,6 +206,15 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 			}
 		}
 	}
+
+	return triplets;
+}
+
+
+Tree* minRILC(std::vector<Tree*>& trees, bool minrs) {
+
+	int n = trees[0]->get_taxas_num();
+	int*** triplets = get_common_triplets(trees);
 
 	uint states = (1 << n);
 	int* opt = new int[states];
@@ -213,6 +230,7 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 	// dp_backtrack[Lbitmask][Dbitmask] is the bitmask of X (line 8 in the MCFS paper)
 	// if positive, it means DP[D\X] < opt[Merge(D\X)], else the number if negative
 	int** dp_backtrack = new int*[states];
+	std::fill(dp_backtrack, dp_backtrack+states, (int*)NULL);
 
 	for (int i = 2; i <= n; i++) {
 		uint Lbitmask = (1 << i)-1; // L' bitmask
@@ -228,6 +246,9 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 			// aho graph components
 			components[Lbitmask] = build_aho(indices, triplets, minrs);
 			int m = components[Lbitmask].size();
+			if (m == 1 && std::bitset<32>(components[Lbitmask][0]).count() == std::bitset<32>(Lbitmask).count()) {
+				return NULL;
+			}
 
 			dp_backtrack[Lbitmask] = new int[1 << m];
 
@@ -277,7 +298,6 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 							optDmX += comb2(countDmX) * (i-countDmX);
 						}
 
-
 						int min2 = std::min(dp[DmXbitmask], optDmX);
 						if (dp[Dbitmask] > optX + min2) {
 							dp[Dbitmask] = optX + min2;
@@ -304,20 +324,71 @@ Tree* minISRS(std::vector<Tree*>& trees, bool minrs) {
 		}
 	}
 
+
 	uint Lbitmask = states-1;
 	Tree* tree = new Tree();
 	print_tree(Lbitmask, components, dp_backtrack, tree, tree->add_node(), minrs);
+
+	delete[] opt;
+	delete[] dp;
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			delete[] triplets[i][j];
+		}
+		delete[] triplets[i];
+	}
+	delete[] triplets;
+	for (int i = 0; i < (int) states; i++) {
+		delete[] dp_backtrack[i];
+	}
+	delete[] dp_backtrack;
+
+	delete[] components;
 
 	return tree;
 }
 
 
-Tree* minRS(std::vector<Tree*>& trees) {
-	return minISRS(trees, true);
+Tree* minRLC_exact(std::vector<Tree*>& trees) {
+	return minRILC(trees, true);
 }
-Tree* minIS(std::vector<Tree*>& trees) {
-	return minISRS(trees, false);
+Tree* minILC_exact(std::vector<Tree*>& trees) {
+	return minRILC(trees, false);
+}
+
+void ahoRec(std::vector<int> indices, int*** triplets, int n, Tree* tree, Tree::Node* node) {
+	std::vector<uint> components = build_aho(indices, triplets, false);
+	for (uint comp : components) {
+		std::vector<int> indices2;
+		for (int j = 0; j < n; j++) {
+			if (comp & (1<<j)) {
+				indices2.push_back(j);
+			}
+		}
+
+		if (indices2.size() == 1) {
+			node->add_child(tree->add_node(indices2[0]));
+		} else {
+			Tree::Node* new_node = tree->add_node();
+			node->add_child(new_node);
+			ahoRec(indices2, triplets, n, tree, new_node);
+		}
+	}
+}
+
+Tree* ahoBuild(std::vector<Tree*>& trees) {
+	int n = trees[0]->get_taxas_num();
+	int*** triplets = get_common_triplets(trees);
+
+	std::vector<int> indices;
+	for (int i = 0; i < n; i++) {
+		indices.push_back(i);
+	}
+
+	Tree* tree = new Tree();
+	ahoRec(indices, triplets, n, tree, tree->add_node());
+	return tree;
 }
 
 
-#endif /* SRC_MINRS_H_ */
+#endif /* SRC_LOCAL_CONSENSUS_H_ */

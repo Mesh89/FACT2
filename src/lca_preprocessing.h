@@ -19,7 +19,7 @@ struct rmq_t {
 	~rmq_t() {
 		for (int** block : prep_blocks) {
 			if (block) {
-				delete[] block[0];
+//				delete[] block[0];
 				delete[] block;
 			}
 		}

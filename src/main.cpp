@@ -5,7 +5,7 @@
 #include "nex_parser.h"
 
 #include "freqdiff.h"
-#include "minrs.h"
+#include "local_consensus.h"
 
 using namespace std;
 
@@ -25,13 +25,25 @@ int main(int argc, char** argv) {
 	Tree* consensus;
 	if (algo == "freq") {
 		consensus = freqdiff(trees, Tree::get_taxas_num() > 1000);
-	} else if (algo == "minrs") {
-		consensus = minRS(trees);
-	} else if (algo == "minis") {
-		consensus = minIS(trees);
+	} else if (algo == "minrlc_exact") {
+		consensus = minRLC_exact(trees);
+	} else if (algo == "minilc_exact") {
+		consensus = minILC_exact(trees);
+	} else if (algo == "aho-build") {
+		consensus = ahoBuild(trees);
 	} else {
 		std::cerr << "Algorithm not supported" << std::endl;
 		return 1;
 	}
-	cout << consensus->to_newick() << endl;
+
+	if (consensus == NULL) {
+		std::cout << "No valid consensus found." << std::endl;
+	} else {
+		cout << consensus->to_newick() << endl;
+	}
+
+	for (Tree* tree : trees) {
+		delete tree;
+	}
+	delete consensus;
 }
