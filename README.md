@@ -2,6 +2,10 @@
 
 This software computes a consensus tree between a set of user-provided phylogenetic trees. It currently supports the Frequency Difference and the Local consensus trees.
 
+## Requirements
+
+This software requires the Boost libraries in order to be compiled. Please refer to http://www.boost.org/doc/ for the installation process. The software was tested with version 1.58, which is recommended.
+
 ## Compiling
 
 First get the source 
