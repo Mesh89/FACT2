@@ -69,6 +69,146 @@ int* parent;
 bool* exists;
 Tree::Node** tree_nodes;
 
+std::vector<Tree::Node*> build_maximal_path_given_head(Tree::Node* head, int l) {
+    std::vector<Tree::Node*> maximal_path;
+
+    Tree::Node* curr = head;
+    while (curr->size >= l) {
+        maximal_path.push_back(curr);
+        if (!curr->is_leaf()) {
+            curr = curr->children[0];
+        } else {
+            break;
+        }
+    }
+
+    // std::reverse(maximal_path.begin(), maximal_path.end());
+
+    return maximal_path;
+}
+
+void build_maximal_paths_for_tree_supp(Tree::Node* root, int l, std::vector<std::vector<Tree::Node*>>& maximal_paths) {
+    if (root->size >= l && root->size < 2 * l) {
+        maximal_paths.push_back(build_maximal_path_given_head(root, l));
+    } else {
+        for (Tree::Node* child : root->children) {
+            build_maximal_paths_for_tree_supp(child, l, maximal_paths);
+        }
+    }
+}
+
+std::vector<std::vector<Tree::Node*>> build_maximal_paths_for_tree(Tree* tree, int l) {
+    std::vector<std::vector<Tree::Node*>> maximal_paths;
+    build_maximal_paths_for_tree_supp(tree->get_root(), l, maximal_paths);
+    return maximal_paths;
+}
+
+std::vector<std::vector<std::vector<Tree::Node*>>> build_maximal_paths(std::vector<Tree*>& trees, int l) {
+    std::vector<std::vector<std::vector<Tree::Node*>>> maximal_paths;
+
+    for (Tree* tree : trees) {
+        maximal_paths.push_back(build_maximal_paths_for_tree(tree, l));
+    }
+
+    return maximal_paths;
+}
+
+struct identifier_t {
+    int identifier;
+    size_t r;
+
+    identifier_t(int identifier, size_t r) : identifier(identifier), r(r) {}
+
+    std::string to_string() {
+        std::stringstream ss;
+        ss << "Id: " << identifier << " r: " << r;
+        return ss.str();
+    }
+};
+
+void calc_w_per_level(std::vector<Tree*>& trees, int l) {
+    std::vector<std::vector<std::vector<Tree::Node*>>> maximal_paths = build_maximal_paths(trees, l);
+
+    std::cout << "l: " << l << std::endl;
+
+    size_t k = trees.size();
+    size_t n = Tree::get_taxas_num();
+    size_t pow2_geq_n = 1;
+    while (pow2_geq_n < n) {
+        pow2_geq_n *= 2;
+    }
+    size_t num_nodes = pow2_geq_n * 2 - 1;
+
+    size_t num_need_to_dup = pow2_geq_n - n;
+    size_t num_no_need_to_dup = n - num_need_to_dup;
+
+    std::cout << "num nodes: " << pow2_geq_n << std::endl;
+
+    std::vector<std::vector<identifier_t*>> bin_tree [num_nodes + 1][k];
+
+    for (int taxa_id = 1; taxa_id < num_nodes + 1; taxa_id++) {
+        for (size_t z = 0; z < k; z++) {
+            for (size_t i = 0; i < maximal_paths[z].size(); i++) {
+                std::vector<identifier_t*> identifier_vector;
+                bin_tree[taxa_id][z].push_back(identifier_vector);
+            }
+        }
+    }
+
+    for (size_t z = 0; z < k; z++) {
+        taxas_ranges_t* tr = build_taxas_ranges(trees[z]);
+
+        for (size_t i = 0; i < maximal_paths[z].size(); i++) {
+            size_t prev_end = tr->intervals[maximal_paths[z][i][0]->id].start - 1;
+            size_t r = 0;
+            for (Tree::Node* node : maximal_paths[z][i]) {
+                for (size_t leaf_idx = prev_end + 1; leaf_idx <= tr->intervals[node->id].end; leaf_idx++) {
+                    int taxa_id = tr->taxas[leaf_idx];
+                    std::cout << "z" << z << "i" << i << "l" << leaf_idx << "r" << r << "n" << node->id << "t" << taxa_id << std::endl;
+
+                    if (taxa_id < num_no_need_to_dup) {
+                        bin_tree[taxa_id + pow2_geq_n][z][i].push_back(new identifier_t(taxa_id, r));
+                    } else {
+                        int taxa_id_in_bin_tree = num_no_need_to_dup + (taxa_id - num_no_need_to_dup) * 2 + pow2_geq_n;
+                        bin_tree[taxa_id_in_bin_tree][z][i].push_back(new identifier_t(taxa_id, r));
+                        bin_tree[taxa_id_in_bin_tree + 1][z][i].push_back(new identifier_t(taxa_id, r));
+                    }
+                    r++;
+                }
+                prev_end = tr->intervals[node->id].end;
+            }
+        }
+    }
+
+    for (int taxa_id = 1; taxa_id < num_nodes + 1; taxa_id++) {
+        std::cout << "Node num: " << taxa_id << std::endl;
+        for (size_t z = 0; z < k; z++) {
+            std::cout << "z: " << z << std::endl;
+            for (size_t i = 0; i < bin_tree[taxa_id][z].size(); i++) {
+                std::cout << "i: " << i << std::endl;
+                for (identifier_t* identifier : bin_tree[taxa_id][z][i]) {
+                    std::cout << identifier->to_string() << std::endl;
+                }
+            }
+        }
+
+        std::cout << std::endl;
+    }
+
+
+    std::cout << std::endl;
+}
+
+void calc_w_knlog2n(std::vector<Tree*>& trees) {
+	size_t n = Tree::get_taxas_num();
+
+    // compute identifiers per level
+    // l = 2 ^ level, nodes u with l <= size(u) < 2 * l are considered
+    for (int l = 1; l <= n; l = l * 2) {
+        calc_w_per_level(trees, l);
+    }
+}
+
 
 // calculate cluster weights using kn^2 method
 void calc_w_kn2(std::vector<Tree*>& trees) {
@@ -769,16 +909,20 @@ Tree* freqdiff(std::vector<Tree*>& trees, bool centroid_paths) {
 	// weights[i][node id] = weights of cluster of node (with node id) in tree i
 	// initialize leaves and roots to "number of trees" because trivial clusters will have that value
 	//calc_w_k2n(trees);
-	for (size_t i = 0; i < trees.size(); i++) {
-		for (size_t j = 0; j < trees[i]->get_nodes_num(); j++) {
-			Tree::Node* node = trees[i]->get_node(j);
-			if (node->is_root() || node->is_leaf()) {
-				node->weight = trees.size();
-			}
-		}
-		trees[i]->reorder();
-	}
-	calc_w_kn2(trees);
+	// for (size_t i = 0; i < trees.size(); i++) {
+	// 	for (size_t j = 0; j < trees[i]->get_nodes_num(); j++) {
+	// 		Tree::Node* node = trees[i]->get_node(j);
+	// 		if (node->is_root() || node->is_leaf()) {
+	// 			node->weight = trees.size();
+	// 		}
+	// 	}
+	// 	trees[i]->reorder();
+	// }
+	calc_w_knlog2n(trees);
+
+    for (Tree* tree : trees) {
+        std::cout << tree->to_string() << std::endl;
+    }
 
 	lca_t** lca_preps = new lca_t*[trees.size()];
 	for (size_t i = 0; i < trees.size(); i++) {

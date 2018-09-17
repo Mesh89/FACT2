@@ -42,8 +42,8 @@ int main(int argc, char** argv) {
 		cout << consensus->to_newick() << endl;
 	}
 
-	for (Tree* tree : trees) {
-		delete tree;
-	}
-	delete consensus;
+	// for (Tree* tree : trees) {
+	// 	delete tree;
+	// }
+	// delete consensus;
 }
