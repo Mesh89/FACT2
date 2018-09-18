@@ -179,7 +179,7 @@ std::vector<std::vector<std::vector<path_identifiers_t*>>> init_bin_tree(std::ve
             for (Tree::Node* node : maximal_paths[z][i]) {
                 for (size_t leaf_idx = prev_end + 1; leaf_idx <= tr->intervals[node->id].end; leaf_idx++) {
                     int taxa_id = tr->taxas[leaf_idx];
-                    std::cout << "z" << z << "i" << i << "l" << leaf_idx << "r" << r << "n" << node->id << "t" << taxa_id << std::endl;
+                    // std::cout << "z" << z << "i" << i << "l" << leaf_idx << "r" << r << "n" << node->id << "t" << taxa_id << std::endl;
 
                     if (taxa_id < num_no_need_to_dup) {
                         bin_tree[taxa_id + pow2_geq_n][z].push_back(new path_identifiers_t(i, new identifier_t(taxa_id, r)));
@@ -195,21 +195,100 @@ std::vector<std::vector<std::vector<path_identifiers_t*>>> init_bin_tree(std::ve
         }
     }
 
-    for (int taxa_id = 1; taxa_id < num_nodes + 1; taxa_id++) {
-        std::cout << "Node num: " << taxa_id << std::endl;
-        for (size_t z = 0; z < k; z++) {
-            std::cout << "z: " << z << std::endl;
-            for (size_t path_idx = 0; path_idx < bin_tree[taxa_id][z].size(); path_idx++) {
-                std::cout << bin_tree[taxa_id][z][path_idx]->to_string() << std::endl;
-            }
-        }
-
-        std::cout << std::endl;
-    }
-
-    std::cout << std::endl;
+    // for (int taxa_id = 1; taxa_id < num_nodes + 1; taxa_id++) {
+    //     std::cout << "Node num: " << taxa_id << std::endl;
+    //     for (size_t z = 0; z < k; z++) {
+    //         std::cout << "z: " << z << std::endl;
+    //         for (size_t path_idx = 0; path_idx < bin_tree[taxa_id][z].size(); path_idx++) {
+    //             std::cout << bin_tree[taxa_id][z][path_idx]->to_string() << std::endl;
+    //         }
+    //     }
+    //
+    //     std::cout << std::endl;
+    // }
+    //
+    // std::cout << std::endl;
 
     return bin_tree;
+}
+
+struct identifier_pair_t {
+    size_t z, i, r;
+    std::pair<int, int> identifiers;
+
+    identifier_pair_t(size_t z, size_t i, size_t r, int id_l, int id_r) : z(z), i(i), r(r), identifiers(std::make_pair(id_l, id_r)) {}
+
+    std::string to_string() {
+        std::stringstream ss;
+        ss << "z: " << z << "i: " << i << "r: " << r << "id_l: " << identifiers.first << "id_r: " << identifiers.second;
+        return ss.str();
+    }
+};
+
+void construct_id_pairs_single_child(std::vector<identifier_pair_t*>& id_pairs, std::vector<path_identifiers_t*>& parent_tree_ids, std::vector<path_identifiers_t*>& child_tree_ids) {
+
+}
+
+void construct_id_pairs_both_children(std::vector<identifier_pair_t*>& id_pairs, std::vector<path_identifiers_t*>& parent_tree_ids, std::vector<path_identifiers_t*>& left_child_tree_ids, std::vector<path_identifiers_t*>& right_child_tree_ids) {
+    // int leaf_idx_l = 0;
+    // int leaf_idx_r = 0;
+    //
+    // // Note that r < n
+    // int r_l = leaf_idx_l < left_child_tree_ids.size() ?
+    //
+    // while (leaf_idx_l < left_child_tree_ids.size() || leaf_idx_r < right_child_tree_ids.size()) {
+    //     r_l =
+    // }
+}
+
+void update_bin_tree(std::vector<std::vector<std::vector<path_identifiers_t*>>>& bin_tree, size_t depth) {
+    size_t first_idx = 1;
+    for (size_t i = 0; i < depth; i++) {
+        first_idx *= 2;
+    }
+
+    std::cout << "d: " << depth << " f: " << first_idx << std::endl;
+
+    if (first_idx * 2 >= bin_tree.size()) {
+        // Leaves of binary tree
+        return;
+    } else {
+        update_bin_tree(bin_tree, depth + 1);
+    }
+
+    std::vector<identifier_pair_t*> id_pairs;
+
+    for (size_t node_idx = first_idx; node_idx < first_idx * 2; node_idx++) {
+        std::vector<std::vector<path_identifiers_t*>> left_child = bin_tree[node_idx * 2];
+        std::vector<std::vector<path_identifiers_t*>> right_child = bin_tree[node_idx * 2 + 1];
+
+        for (size_t z = 0; z < left_child.size(); z++) {
+            int path_idx_l = 0;
+            int path_idx_r = 0;
+            while (path_idx_l < left_child[z].size() || path_idx_r < right_child[z].size()) {
+                std::cout << "pl" << path_idx_l << "pr" << path_idx_r << std::endl;
+                // Note that i < n
+                int i_l = path_idx_l < left_child[z].size() ? left_child[z][path_idx_l]->i : Tree::get_taxas_num();
+                int i_r = path_idx_r < right_child[z].size() ? right_child[z][path_idx_r]->i : Tree::get_taxas_num();
+
+                std::cout << "il" << i_l << "ir" << i_r << std::endl;
+                if (i_l < i_r) {
+                    // only get from i_l
+                    construct_id_pairs_single_child(id_pairs, bin_tree[node_idx][z], bin_tree[node_idx * 2][z]);
+                    path_idx_l++;
+                } else if (i_r < i_l) {
+                    // only get from i_r
+                    construct_id_pairs_single_child(id_pairs, bin_tree[node_idx][z], bin_tree[node_idx * 2 + 1][z]);
+                    path_idx_r++;
+                } else {
+                    // need to get from both
+                    construct_id_pairs_both_children(id_pairs, bin_tree[node_idx][z], bin_tree[node_idx * 2][z], bin_tree[node_idx * 2 + 1][z]);
+                    path_idx_l++;
+                    path_idx_r++;
+                }
+            }
+        }
+    }
 }
 
 void calc_w_per_level(std::vector<Tree*>& trees, int l) {
@@ -218,6 +297,9 @@ void calc_w_per_level(std::vector<Tree*>& trees, int l) {
     std::cout << "l: " << l << std::endl;
 
     std::vector<std::vector<std::vector<path_identifiers_t*>>> bin_tree = init_bin_tree(trees, maximal_paths);
+
+    update_bin_tree(bin_tree, 0);
+    std::cout << std::endl;
 }
 
 void calc_w_knlog2n(std::vector<Tree*>& trees) {
@@ -941,9 +1023,9 @@ Tree* freqdiff(std::vector<Tree*>& trees, bool centroid_paths) {
 	// }
 	calc_w_knlog2n(trees);
 
-    for (Tree* tree : trees) {
-        std::cout << tree->to_string() << std::endl;
-    }
+    // for (Tree* tree : trees) {
+    //     std::cout << tree->to_string() << std::endl;
+    // }
 
 	lca_t** lca_preps = new lca_t*[trees.size()];
 	for (size_t i = 0; i < trees.size(); i++) {
