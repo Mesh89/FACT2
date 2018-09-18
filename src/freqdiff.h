@@ -144,12 +144,8 @@ struct path_identifiers_t {
     }
 };
 
-void calc_w_per_level(std::vector<Tree*>& trees, int l) {
-    std::vector<std::vector<std::vector<Tree::Node*>>> maximal_paths = build_maximal_paths(trees, l);
-
-    std::cout << "l: " << l << std::endl;
-
-    size_t k = trees.size();
+std::vector<std::vector<std::vector<path_identifiers_t*>>> init_bin_tree(std::vector<Tree*>& trees, std::vector<std::vector<std::vector<Tree::Node*>>>& maximal_paths) {
+        size_t k = trees.size();
     size_t n = Tree::get_taxas_num();
     size_t pow2_geq_n = 1;
     while (pow2_geq_n < n) {
@@ -212,6 +208,16 @@ void calc_w_per_level(std::vector<Tree*>& trees, int l) {
     }
 
     std::cout << std::endl;
+
+    return bin_tree;
+}
+
+void calc_w_per_level(std::vector<Tree*>& trees, int l) {
+    std::vector<std::vector<std::vector<Tree::Node*>>> maximal_paths = build_maximal_paths(trees, l);
+
+    std::cout << "l: " << l << std::endl;
+
+    std::vector<std::vector<std::vector<path_identifiers_t*>>> bin_tree = init_bin_tree(trees, maximal_paths);
 }
 
 void calc_w_knlog2n(std::vector<Tree*>& trees) {
