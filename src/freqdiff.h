@@ -126,6 +126,24 @@ struct identifier_t {
     }
 };
 
+struct path_identifiers_t {
+    size_t i;
+    std::vector<identifier_t*>* identifiers;
+
+    path_identifiers_t(size_t i, identifier_t* identifier) : i(i), identifiers(new std::vector<identifier_t*>()) {
+        identifiers->push_back(identifier);
+    }
+
+    std::string to_string() {
+        std::stringstream ss;
+        ss << "i: " << i;
+        for (identifier_t* identifier : *identifiers) {
+            ss << " " << identifier->to_string();
+        }
+        return ss.str();
+    }
+};
+
 void calc_w_per_level(std::vector<Tree*>& trees, int l) {
     std::vector<std::vector<std::vector<Tree::Node*>>> maximal_paths = build_maximal_paths(trees, l);
 
@@ -144,14 +162,15 @@ void calc_w_per_level(std::vector<Tree*>& trees, int l) {
 
     std::cout << "num nodes: " << pow2_geq_n << std::endl;
 
-    std::vector<std::vector<identifier_t*>> bin_tree [num_nodes + 1][k];
+    std::vector<std::vector<std::vector<path_identifiers_t*>>> bin_tree;
 
-    for (int taxa_id = 1; taxa_id < num_nodes + 1; taxa_id++) {
+    for (int taxa_id = 0; taxa_id < num_nodes + 1; taxa_id++) {
+        std::vector<std::vector<path_identifiers_t*>> node_identifiers;
+        bin_tree.push_back(node_identifiers);
+
         for (size_t z = 0; z < k; z++) {
-            for (size_t i = 0; i < maximal_paths[z].size(); i++) {
-                std::vector<identifier_t*> identifier_vector;
-                bin_tree[taxa_id][z].push_back(identifier_vector);
-            }
+            std::vector<path_identifiers_t*> tree_identifiers;
+            bin_tree[taxa_id].push_back(tree_identifiers);
         }
     }
 
@@ -167,11 +186,11 @@ void calc_w_per_level(std::vector<Tree*>& trees, int l) {
                     std::cout << "z" << z << "i" << i << "l" << leaf_idx << "r" << r << "n" << node->id << "t" << taxa_id << std::endl;
 
                     if (taxa_id < num_no_need_to_dup) {
-                        bin_tree[taxa_id + pow2_geq_n][z][i].push_back(new identifier_t(taxa_id, r));
+                        bin_tree[taxa_id + pow2_geq_n][z].push_back(new path_identifiers_t(i, new identifier_t(taxa_id, r)));
                     } else {
                         int taxa_id_in_bin_tree = num_no_need_to_dup + (taxa_id - num_no_need_to_dup) * 2 + pow2_geq_n;
-                        bin_tree[taxa_id_in_bin_tree][z][i].push_back(new identifier_t(taxa_id, r));
-                        bin_tree[taxa_id_in_bin_tree + 1][z][i].push_back(new identifier_t(taxa_id, r));
+                        bin_tree[taxa_id_in_bin_tree][z].push_back(new path_identifiers_t(i, new identifier_t(taxa_id, r)));
+                        bin_tree[taxa_id_in_bin_tree + 1][z].push_back(new path_identifiers_t(i, new identifier_t(taxa_id, r)));
                     }
                     r++;
                 }
@@ -184,17 +203,13 @@ void calc_w_per_level(std::vector<Tree*>& trees, int l) {
         std::cout << "Node num: " << taxa_id << std::endl;
         for (size_t z = 0; z < k; z++) {
             std::cout << "z: " << z << std::endl;
-            for (size_t i = 0; i < bin_tree[taxa_id][z].size(); i++) {
-                std::cout << "i: " << i << std::endl;
-                for (identifier_t* identifier : bin_tree[taxa_id][z][i]) {
-                    std::cout << identifier->to_string() << std::endl;
-                }
+            for (size_t path_idx = 0; path_idx < bin_tree[taxa_id][z].size(); path_idx++) {
+                std::cout << bin_tree[taxa_id][z][path_idx]->to_string() << std::endl;
             }
         }
 
         std::cout << std::endl;
     }
-
 
     std::cout << std::endl;
 }
