@@ -213,10 +213,10 @@ std::vector<std::vector<std::vector<path_identifiers_t*>>> init_bin_tree(std::ve
 }
 
 struct identifier_pair_t {
-    size_t z, i, r;
+    size_t z, i, leaf_idx;
     std::pair<int, int> identifiers;
 
-    identifier_pair_t(size_t z, size_t i, size_t r, int id_l, int id_r) : z(z), i(i), r(r), identifiers(std::make_pair(id_l, id_r)) {}
+    identifier_pair_t(size_t z, size_t i, size_t leaf_idx, int id_l, int id_r) : z(z), i(i), leaf_idx(leaf_idx), identifiers(std::make_pair(id_l, id_r)) {}
 
     std::string to_string() {
         std::stringstream ss;
@@ -230,15 +230,26 @@ void construct_id_pairs_single_child(std::vector<identifier_pair_t*>& id_pairs, 
 }
 
 void construct_id_pairs_both_children(std::vector<identifier_pair_t*>& id_pairs, std::vector<path_identifiers_t*>& parent_tree_ids, std::vector<path_identifiers_t*>& left_child_tree_ids, std::vector<path_identifiers_t*>& right_child_tree_ids) {
-    // int leaf_idx_l = 0;
-    // int leaf_idx_r = 0;
-    //
-    // // Note that r < n
-    // int r_l = leaf_idx_l < left_child_tree_ids.size() ?
-    //
-    // while (leaf_idx_l < left_child_tree_ids.size() || leaf_idx_r < right_child_tree_ids.size()) {
-    //     r_l =
-    // }
+    int leaf_idx_l = 0;
+    int leaf_idx_r = 0;
+
+    // Note that r < n
+    int r_l = left_child_tree_ids.size() > 0 ? left_child_tree_ids[0]->r : Tree::get_taxas_num();
+    int r_r = right_child_tree_ids.size() > 0 ? right_child_tree_ids[0]->r : Tree::get_taxas_num();
+
+    if (r_l < r_r) {
+        // Need to pass in z and i
+        id_pairs.push_back(new identifier_pair_t(z, i, 0, left_child_tree_ids[0]->identifier, -1))
+        
+        // Need to create new vector in parent also
+    } else {
+        // Note that r_l != r_r
+        id_pairs.push_back(new identifier_pair_t(z, i, 0, -1, right_child_tree_ids[0]->identifier))
+    }
+
+    while (leaf_idx_l < left_child_tree_ids.size() || leaf_idx_r < right_child_tree_ids.size()) {
+        r_l =
+    }
 }
 
 void update_bin_tree(std::vector<std::vector<std::vector<path_identifiers_t*>>>& bin_tree, size_t depth) {
