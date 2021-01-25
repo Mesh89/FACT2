@@ -26,9 +26,9 @@ An executable FACT++ will be produced.
 
 Running FACT2 is straightforward:
 ```
-./FACT++ [freq|minrs|minis] filename
+./FACT++ [freq|minrlc_exact|minilc_exact] filename
 ```
-where freq stands for Frequency Difference and minrs and minis stand for MinRS and MinIS, respectively.
+where freq stands for Frequency Difference and minrlc_exact and minilc_exact stand for MinRS and MinIS, respectively.
 
 The file must be in Nexus format. See http://10ktrees.nunn-lab.org/ for examples of Nexus files compatible with FACT2.
 
